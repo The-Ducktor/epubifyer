@@ -1,6 +1,9 @@
 {
   "name": "epubifyer",
   "module": "src/index.ts",
+  "version": "0.0.1",
+  "description": "A tool to convert EPUB files to a more web-friendly format.",
+  "author": "The Ducktor",
   "type": "module",
   "devDependencies": {
     "@types/bun": "latest"

@@ -67,7 +67,7 @@ class Epub {
 	private generateUUID(): string {
 		return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
 			/[xy]/g,
-			function (c) {
+			(c) => {
 				const r = (Math.random() * 16) | 0;
 				const v = c === "x" ? r : (r & 0x3) | 0x8;
 				return v.toString(16);
@@ -389,7 +389,7 @@ class Epub {
 	 * @param filePath - The path where the EPUB file will be saved.
 	 *                   Use "[nothing]" to return content without saving.
 	 * @returns Promise resolving to the EPUB content as a Uint8Array if filePath is "[nothing]",
-	 *          otherwise undefined after saving to file
+	 *          otherwise undefined after saving to file (Bun only).
 	 */
 	async save(
 		filePath = "[nothing]",
