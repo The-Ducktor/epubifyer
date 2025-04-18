@@ -1,38 +1,49 @@
 {
-	"name": "epubifyer",
-	"module": "dist/index.js",
-	"main": "dist/index.js",
-	"types": "dist/index.d.ts",
-	"version": "0.0.5",
-	"description": "A tool to convert EPUB files to a more web-friendly format.",
-	"author": "The Ducktor",
-	"type": "module",
-	"exports": {
-		".": {
-			"types": "./dist/index      bun add -d semver.d.ts",
-			"import": "./dist/index.js"
-		}
-	},
-	"files": ["dist", "README.md"],
-	"devDependencies": {
-		"@types/bun": "latest"
-	},
-	"scripts": {
-		"build": "bun build src/index.ts --outdir dist --minify && tsc --emitDeclarationOnly --declaration --outDir dist",
-		"prepublishOnly": "bun run build",
-		"test": "bun test",
-		"version:bump": "bunx npm version patch"
-	},
-	"peerDependencies": {
-		"typescript": "^5"
-	},
-	"dependencies": {
-		"cheerio": "^1.0.0",
-		"jszip": "^3.10.1"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/The-Ducktor/epubifyer.git"
-	},
-	"keywords": ["epub", "converter", "ebook"]
+  "name": "epubifyer",
+  "module": "dist/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "version": "0.0.9",
+  "description": "A tool to convert EPUB files to a more web-friendly format.",
+  "author": "The Ducktor",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index      bun add -d semver.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/jsdom": "^21.1.7"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --minify --target=bun && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "version:bump": "bunx npm version patch"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@b-fuze/deno-dom": "npm:@jsr/b-fuze__deno-dom@^0.1.49",
+    "@types/dompurify": "^3.2.0",
+    "dompurify": "^3.2.5",
+    "jsdom": "^26.1.0",
+    "jszip": "^3.10.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/The-Ducktor/epubifyer.git"
+  },
+  "keywords": [
+    "epub",
+    "converter",
+    "ebook"
+  ]
 }
