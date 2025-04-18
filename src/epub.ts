@@ -92,8 +92,8 @@ class Epub {
 
 		const href = `text/${id}.xhtml`;
 
-		// Parse HTML with Cheerio
-		const $ = cheerio.load(html, { xmlMode: false });
+		// Parse HTML with Cheerio - setting xmlMode to true ensures proper XML handling
+		const $ = cheerio.load(html, { xmlMode: true });
 
 		const imgPromises: Promise<void>[] = [];
 		$("img").each((_, el) => {
@@ -140,27 +140,31 @@ class Epub {
 
 		await Promise.all(imgPromises);
 
-		// Serialize HTML
-		let finalHtml = $.html();
+		// Prepare properly formatted XHTML content
+		let bodyContent: string;
 
-		// Ensure HTML is properly formatted for EPUB with correct namespaces
-		if (
-			!finalHtml.includes("<!DOCTYPE html>") &&
-			!finalHtml.includes("<html")
-		) {
-			finalHtml = `<?xml version="1.0" encoding="UTF-8"?>
+		// Extract content or use the whole document
+		if (!html.includes("<!DOCTYPE html>") && !html.includes("<html")) {
+			// It's a fragment, wrap the content in a div to preserve namespaces
+			bodyContent = $.html();
+		} else {
+			// It has HTML structure already, extract the body content
+			bodyContent = $("body").html() || html;
+		}
+
+		// Create a properly formatted XHTML document with correct namespaces
+		const finalHtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${this.metadata.language}">
 <head>
   <meta charset="UTF-8" />
   <title>${title}</title>
   ${this.cssFiles.map((css) => `<link rel="stylesheet" type="text/css" href="../${css}"/>`).join("\n  ")}
 </head>
 <body>
-  ${finalHtml}
+  ${bodyContent}
 </body>
 </html>`;
-		}
 
 		this.items.push({
 			id,
@@ -345,9 +349,23 @@ class Epub {
 		// Create proper directory structure
 		this.ensureDirectoriesExist();
 
-		// Build the spine
-		const spineItems = this.spine.map((id) => `<itemref idref="${id}"/>`);
+		// Build the spine - only include XHTML files
+		const xhtmlItems = this.items.filter(
+			(item) => item.mediaType === "application/xhtml+xml" && item.id !== "nav",
+		);
 
+		// Use spine order if available, otherwise use all XHTML items
+		const spineItems =
+			this.spine.length > 0
+				? this.spine
+						.filter((id) => xhtmlItems.some((item) => item.id === id))
+						.map((id) => `<itemref idref="${id}"/>`)
+				: xhtmlItems.map((item) => `<itemref idref="${item.id}"/>`);
+
+		// Ensure at least one itemref exists
+		if (spineItems.length === 0 && xhtmlItems.length > 0) {
+			spineItems.push(`<itemref idref="${xhtmlItems[0].id}"/>`);
+		}
 		return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -395,8 +413,19 @@ class Epub {
 	 */
 	private generateNav(): string {
 		const renderToc = (navPoints: NavPoint[]): string => {
-			if (navPoints.length === 0) return "";
+			if (navPoints.length === 0) {
+				// Find the first available chapter
+				const firstChapter = this.items.find(
+					(item) =>
+						item.mediaType === "application/xhtml+xml" && item.id !== "nav",
+				);
 
+				if (firstChapter) {
+					return `<ol><li><a href="${firstChapter.href}">Start</a></li></ol>`;
+				}
+				// Fallback to an empty list if no chapters exist
+				return `<ol><li><a href="#">Start</a></li></ol>`;
+			}
 			return `<ol>
         ${navPoints
 					.map(

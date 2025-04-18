@@ -23,7 +23,7 @@ test("Create EPUB book", async () => {
 	);
 
 	// Add chapters
-	book.addChapter(
+	await book.addChapter(
 		"Introduction",
 		`
     <h1>Introduction</h1>
@@ -32,7 +32,7 @@ test("Create EPUB book", async () => {
   `,
 	);
 
-	book.addChapter(
+	await book.addChapter(
 		"Chapter 1",
 		`
     <h1>Getting Started with EPUB</h1>
@@ -41,7 +41,7 @@ test("Create EPUB book", async () => {
   `,
 	);
 
-	book.addChapter(
+	await book.addChapter(
 		"Chapter 2",
 		`
     <h1>Creating EPUB Files</h1>
@@ -85,17 +85,16 @@ test("Validate EPUB with epubcheck", async () => {
 		const exists = await Bun.file(outputPath).exists();
 		expect(exists).toBe(true);
 
-		// Run epubcheck command on the previously created file
-		const proc = Bun.spawn(["epubcheck", outputPath]);
+		const tempJsonPath = "temp";
+
+		// Run epubcheck with JSON output to a temp file
+		const proc = Bun.spawn(["epubcheck", outputPath, "-j", tempJsonPath]);
 
 		// Wait for process to complete
 		await proc.exited;
-		const stdout = await new Response(proc.stdout).arrayBuffer();
 		const stderr = await new Response(proc.stderr).arrayBuffer();
-		const output = new TextDecoder().decode(new Uint8Array(stdout));
 		const error = new TextDecoder().decode(new Uint8Array(stderr));
 
-		console.log("EPUBCheck Output:", output);
 		if (error.length > 0) console.error("EPUBCheck Errors:", error);
 
 		const exitCode = await proc.exitCode;
@@ -108,6 +107,28 @@ test("Validate EPUB with epubcheck", async () => {
 			expect.skip("Skipping due to epubcheck not being available");
 		} else {
 			expect(exitCode).toBe(0);
+
+			// Read and parse the JSON output from the temp file
+			const tempFile = Bun.file(tempJsonPath);
+			const tempExists = await tempFile.exists();
+			expect(tempExists).toBe(true);
+
+			const jsonText = await tempFile.text();
+			let json: any;
+			try {
+				json = JSON.parse(jsonText);
+			} catch (e) {
+				console.error("Failed to parse epubcheck JSON output:", e, jsonText);
+				expect(false).toBe(true);
+			}
+
+			// Delete the temp file
+			
+
+			// Assert no errors or fatals
+			expect(json.checker.nError).toBe(0);
+			expect(json.checker.nFatal).toBe(0);
+			expect(Array.isArray(json.messages) ? json.messages.length : 0).toBe(0);
 		}
 	} catch (error) {
 		console.error("Error validating EPUB:", error);

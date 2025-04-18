@@ -3,13 +3,13 @@
 	"module": "dist/index.js",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
-	"version": "0.0.3",
+	"version": "0.0.5",
 	"description": "A tool to convert EPUB files to a more web-friendly format.",
 	"author": "The Ducktor",
 	"type": "module",
 	"exports": {
 		".": {
-			"types": "./dist/index.d.ts",
+			"types": "./dist/index      bun add -d semver.d.ts",
 			"import": "./dist/index.js"
 		}
 	},
@@ -20,12 +20,14 @@
 	"scripts": {
 		"build": "bun build src/index.ts --outdir dist --minify && tsc --emitDeclarationOnly --declaration --outDir dist",
 		"prepublishOnly": "bun run build",
-		"test": "bun test"
+		"test": "bun test",
+		"version:bump": "bunx npm version patch"
 	},
 	"peerDependencies": {
 		"typescript": "^5"
 	},
 	"dependencies": {
+		"cheerio": "^1.0.0",
 		"jszip": "^3.10.1"
 	},
 	"repository": {
