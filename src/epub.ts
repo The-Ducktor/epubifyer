@@ -36,6 +36,10 @@ class Epub {
 	private cssFiles: string[];
 	private uniqueIdCount: number;
 
+	/**
+	 * Creates a new EPUB document
+	 * @param metadata - Optional metadata for the EPUB
+	 */
 	constructor(metadata: Partial<EpubMetadata> = {}) {
 		this.metadata = {
 			title: metadata.title || "Untitled",
@@ -55,7 +59,11 @@ class Epub {
 		this.uniqueIdCount = 0;
 	}
 
-	// Generate a UUID v4
+	/**
+	 * Generates a UUID v4 for use as unique identifier
+	 * @returns A string containing a UUID v4
+	 * @private
+	 */
 	private generateUUID(): string {
 		return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
 			/[xy]/g,
@@ -67,7 +75,13 @@ class Epub {
 		);
 	}
 
-	// Add HTML content file
+	/**
+	 * Adds a chapter (HTML content file) to the EPUB
+	 * @param title - The title of the chapter
+	 * @param html - The HTML content
+	 * @param id - Optional ID for the chapter (generated if not provided)
+	 * @returns The ID of the added chapter
+	 */
 	addChapter(title: string, html: string, id: string = ""): string {
 		// Create unique ID if not provided
 		if (!id) {
@@ -111,7 +125,13 @@ class Epub {
 		return id;
 	}
 
-	// Add an image to the EPUB
+	/**
+	 * Adds an image to the EPUB
+	 * @param id - The identifier for the image
+	 * @param filename - The filename for the image
+	 * @param data - The binary data of the image
+	 * @param mediaType - The MIME type of the image (e.g., "image/jpeg", "image/png")
+	 */
 	addImage(
 		id: string,
 		filename: string,
@@ -132,7 +152,11 @@ class Epub {
 		});
 	}
 
-	// Add a CSS file
+	/**
+	 * Adds a CSS stylesheet to the EPUB
+	 * @param id - The identifier for the CSS file
+	 * @param css - The CSS content
+	 */
 	addCSS(id: string, css: string): void {
 		const href = `styles/${id}.css`;
 
@@ -146,12 +170,20 @@ class Epub {
 		this.cssFiles.push(href);
 	}
 
-	// Set book metadata
+	/**
+	 * Updates the EPUB metadata
+	 * @param metadata - Partial metadata to update
+	 */
 	setMetadata(metadata: Partial<EpubMetadata>): void {
 		this.metadata = { ...this.metadata, ...metadata };
 	}
 
-	// Add a TOC entry
+	/**
+	 * Adds an entry to the table of contents
+	 * @param id - The ID of the content item to add to the TOC
+	 * @param title - The title to display in the TOC
+	 * @param parentId - Optional parent ID for nesting TOC entries
+	 */
 	addToTOC(id: string, title: string, parentId?: string): void {
 		const item = this.items.find((i) => i.id === id);
 		if (!item) return;
@@ -169,6 +201,14 @@ class Epub {
 		}
 	}
 
+	/**
+	 * Adds a navigation point to a parent navigation point
+	 * @param navPoints - Array of navigation points to search through
+	 * @param parentId - ID of the parent navigation point
+	 * @param newNavPoint - Navigation point to add
+	 * @returns True if the navigation point was added, false otherwise
+	 * @private
+	 */
 	private addToParentNavPoint(
 		navPoints: NavPoint[],
 		parentId: string,
@@ -190,7 +230,11 @@ class Epub {
 		return false;
 	}
 
-	// Generate the OPF file
+	/**
+	 * Generates the OPF (Open Packaging Format) content
+	 * @returns The OPF content as a string
+	 * @private
+	 */
 	private generateOPF(): string {
 		const manifestItems = [
 			// Add nav file
@@ -234,7 +278,10 @@ class Epub {
 </package>`;
 	}
 
-	// Ensure all required directories exist in the ZIP
+	/**
+	 * Ensures that all required directories exist in the ZIP
+	 * @private
+	 */
 	private ensureDirectoriesExist(): void {
 		// Make sure we have directories for all item paths
 		const dirs = new Set<string>();
@@ -248,7 +295,11 @@ class Epub {
 		});
 	}
 
-	// Generate the navigation document
+	/**
+	 * Generates the navigation document (TOC)
+	 * @returns The navigation document content as a string
+	 * @private
+	 */
 	private generateNav(): string {
 		const renderToc = (navPoints: NavPoint[]): string => {
 			if (navPoints.length === 0) return "";
@@ -283,7 +334,10 @@ class Epub {
 </html>`;
 	}
 
-	// Generate the EPUB file
+	/**
+	 * Generates the EPUB file as a JSZip object
+	 * @returns Promise resolving to a JSZip object containing the EPUB
+	 */
 	async generate(): Promise<JSZip> {
 		const zip = new JSZip();
 
@@ -330,17 +384,22 @@ class Epub {
 		return zip;
 	}
 
-	// Save EPUB to file
-    /// Save EPUB to file
-    /// @param filePath - The path where the EPUB file will be saved
-    /// @returns The content of the EPUB file as a Uint8Array
-	async save(filePath = "[nothing]"): Promise<Uint8Array<ArrayBufferLike> | undefined> {
+	/**
+	 * Saves the EPUB to a file or returns its content
+	 * @param filePath - The path where the EPUB file will be saved.
+	 *                   Use "[nothing]" to return content without saving.
+	 * @returns Promise resolving to the EPUB content as a Uint8Array if filePath is "[nothing]",
+	 *          otherwise undefined after saving to file
+	 */
+	async save(
+		filePath = "[nothing]",
+	): Promise<Uint8Array<ArrayBufferLike> | undefined> {
 		const zip = await this.generate();
-        
+
 		const content = await zip.generateAsync({ type: "uint8array" });
-        if (filePath === "[nothing]") {
-            return content; // Return the content for script usage
-        }
+		if (filePath === "[nothing]") {
+			return content; // Return the content for script usage
+		}
 		await Bun.write(filePath, content);
 	}
 }
