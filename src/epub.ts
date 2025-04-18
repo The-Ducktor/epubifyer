@@ -62,8 +62,10 @@ class Epub {
 	private async imageProcessing(html: string): Promise<string> {
 		const parser = new DOMParser();
 		const doc = parser.parseFromString(html, "text/html");
-		const images = doc.querySelectorAll("img");
+		if (!doc) return html;
 
+		// Handle images
+		const images = doc.querySelectorAll("img");
 		for (const img of images) {
 			const srcset = img.getAttribute("srcset");
 			let chosenUrl: string | null = null;
@@ -103,6 +105,13 @@ class Epub {
 			// Remove width/height attributes (not allowed in EPUB 3.3 for <img>)
 			img.removeAttribute("width");
 			img.removeAttribute("height");
+		}
+
+		// Remove width/height attributes from all elements (not allowed in EPUB 3.3)
+		const allElements = doc.querySelectorAll("*");
+		for (const element of allElements) {
+			element.removeAttribute("width");
+			element.removeAttribute("height");
 		}
 
 		// Only return the inner HTML of the <body> to avoid nested <html> tags
