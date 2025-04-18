@@ -1,3 +1,4 @@
+import * as cheerio from "cheerio";
 import JSZip from "jszip";
 
 // Types for EPUB metadata and content items
@@ -65,14 +66,11 @@ class Epub {
 	 * @private
 	 */
 	private generateUUID(): string {
-		return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-			/[xy]/g,
-			(c) => {
-				const r = (Math.random() * 16) | 0;
-				const v = c === "x" ? r : (r & 0x3) | 0x8;
-				return v.toString(16);
-			},
-		);
+		return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+			const r = (Math.random() * 16) | 0;
+			const v = c === "x" ? r : (r & 0x3) | 0x8;
+			return v.toString(16);
+		});
 	}
 
 	/**
@@ -82,7 +80,11 @@ class Epub {
 	 * @param id - Optional ID for the chapter (generated if not provided)
 	 * @returns The ID of the added chapter
 	 */
-	addChapter(title: string, html: string, id: string = ""): string {
+	async addChapter(
+		title: string,
+		html: string,
+		id: string = "",
+	): Promise<string> {
 		// Create unique ID if not provided
 		if (!id) {
 			id = `chapter_${++this.uniqueIdCount}`;
@@ -90,9 +92,63 @@ class Epub {
 
 		const href = `text/${id}.xhtml`;
 
+		// Parse HTML with Cheerio
+		const $ = cheerio.load(html, { xmlMode: false });
+
+		const imgPromises: Promise<void>[] = [];
+		$("img").each((_, el) => {
+			const src = $(el).attr("src");
+			if (!src) return;
+
+			// Remote image (http/https)
+			if (/^https?:\/\//i.test(src)) {
+				const url = src;
+				const ext = url.split(".").pop()?.split(/\#|\?/)[0] || "img";
+				const imgId = `img_${this.uniqueIdCount++}`;
+				const filename = `${imgId}.${ext}`;
+				const localHref = `images/${filename}`;
+				const mediaType = this.getMediaTypeFromExt(ext);
+
+				const p = fetch(url)
+					.then(async (res) => {
+						if (!res.ok) throw new Error(`Failed to fetch image: ${url}`);
+						const buf = new Uint8Array(await res.arrayBuffer());
+						this.addImage(imgId, filename, buf, mediaType);
+						$(el).attr("src", `../${localHref}`);
+					})
+					.catch(() => {
+						// If fetch fails, leave src as is
+					});
+				imgPromises.push(p);
+			}
+			// Data URL image
+			else if (/^data:image\/([a-zA-Z0-9.+-]+);base64,/.test(src)) {
+				const match = src.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+				if (match) {
+					const mediaType = match[1];
+					const data = match[2];
+					const buf = Uint8Array.from(Buffer.from(data, "base64"));
+					const ext = this.getExtFromMediaType(mediaType);
+					const imgId = `img_${this.uniqueIdCount++}`;
+					const filename = `${imgId}.${ext}`;
+					this.addImage(imgId, filename, buf, mediaType);
+					$(el).attr("src", `../images/${filename}`);
+				}
+			}
+			// Already local, do nothing
+		});
+
+		await Promise.all(imgPromises);
+
+		// Serialize HTML
+		let finalHtml = $.html();
+
 		// Ensure HTML is properly formatted for EPUB with correct namespaces
-		if (!html.includes("<!DOCTYPE html>") && !html.includes("<html")) {
-			html = `<?xml version="1.0" encoding="UTF-8"?>
+		if (
+			!finalHtml.includes("<!DOCTYPE html>") &&
+			!finalHtml.includes("<html")
+		) {
+			finalHtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 <head>
@@ -101,7 +157,7 @@ class Epub {
   ${this.cssFiles.map((css) => `<link rel="stylesheet" type="text/css" href="../${css}"/>`).join("\n  ")}
 </head>
 <body>
-  ${html}
+  ${finalHtml}
 </body>
 </html>`;
 		}
@@ -110,7 +166,7 @@ class Epub {
 			id,
 			href,
 			mediaType: "application/xhtml+xml",
-			content: html,
+			content: finalHtml,
 		});
 
 		this.spine.push(id);
@@ -123,6 +179,43 @@ class Epub {
 		});
 
 		return id;
+	}
+
+	// Helper: get media type from extension
+	private getMediaTypeFromExt(ext: string): string {
+		switch (ext.toLowerCase()) {
+			case "jpg":
+			case "jpeg":
+				return "image/jpeg";
+			case "png":
+				return "image/png";
+			case "gif":
+				return "image/gif";
+			case "svg":
+				return "image/svg+xml";
+			case "webp":
+				return "image/webp";
+			default:
+				return "application/octet-stream";
+		}
+	}
+
+	// Helper: get extension from media type
+	private getExtFromMediaType(mediaType: string): string {
+		switch (mediaType) {
+			case "image/jpeg":
+				return "jpg";
+			case "image/png":
+				return "png";
+			case "image/gif":
+				return "gif";
+			case "image/svg+xml":
+				return "svg";
+			case "image/webp":
+				return "webp";
+			default:
+				return "img";
+		}
 	}
 
 	/**

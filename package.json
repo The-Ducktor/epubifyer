@@ -1,21 +1,36 @@
 {
-  "name": "epubifyer",
-  "module": "src/index.ts",
-  "version": "0.0.1",
-  "description": "A tool to convert EPUB files to a more web-friendly format.",
-  "author": "The Ducktor",
-  "type": "module",
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "scripts": {
-    "build": "bun build src/index.ts --outdir dist --minify",
-    "test": "bun test"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "dependencies": {
-    "jszip": "^3.10.1"
-  }
+	"name": "epubifyer",
+	"module": "dist/index.js",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"version": "0.0.3",
+	"description": "A tool to convert EPUB files to a more web-friendly format.",
+	"author": "The Ducktor",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": ["dist", "README.md"],
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"scripts": {
+		"build": "bun build src/index.ts --outdir dist --minify && tsc --emitDeclarationOnly --declaration --outDir dist",
+		"prepublishOnly": "bun run build",
+		"test": "bun test"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"dependencies": {
+		"jszip": "^3.10.1"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/The-Ducktor/epubifyer.git"
+	},
+	"keywords": ["epub", "converter", "ebook"]
 }
