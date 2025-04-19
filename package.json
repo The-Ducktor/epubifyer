@@ -21,7 +21,7 @@
     "@types/bun": "latest"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --minify --target=bun && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build": "bun build src/index.ts --outdir dist --target=bun && tsc --emitDeclarationOnly --declaration --outDir dist",
     "prepublishOnly": "bun run build",
     "test": "bun test",
     "version:bump": "bunx npm version patch"

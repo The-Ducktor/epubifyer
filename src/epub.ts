@@ -141,6 +141,76 @@ class Epub {
 	}
 
 	/**
+	 * Adds a cover image to the EPUB
+	 * @param source - Path to image file, URL, or base64-encoded image data
+	 * @returns Promise resolving to the ID of the added cover image
+	 */
+	async addCover(source: string): Promise<string> {
+		let data: Uint8Array;
+		let mediaType: string;
+		let ext: string;
+
+		// Process based on source type
+		if (source.startsWith("data:")) {
+			// Handle base64 data URI
+			const match = source.match(/^data:([^;]+);base64,(.+)$/);
+			if (!match) {
+				throw new Error("Invalid base64 data URI format");
+			}
+			mediaType = match[1];
+			ext = this.getExtFromMediaType(mediaType);
+			data = new Uint8Array(Buffer.from(match[2], "base64"));
+		} else if (this.isurl(source)) {
+			// Handle URL
+			try {
+				const response = await fetch(source);
+				if (!response.ok) {
+					throw new Error(`Failed to fetch image: ${response.statusText}`);
+				}
+				data = new Uint8Array(await response.arrayBuffer());
+				// Try to determine media type from Content-Type header or URL extension
+				const contentType = response.headers.get("Content-Type");
+				if (contentType?.startsWith("image/")) {
+					mediaType = contentType;
+					ext = this.getExtFromMediaType(mediaType);
+				} else {
+					ext = source.split(".").pop()?.split("?")[0] || "jpg";
+					mediaType = this.getMediaTypeFromExt(ext);
+				}
+			} catch (error) {
+				throw new Error(
+					`Failed to fetch cover image: ${(error as Error).message}`,
+				);
+			}
+		} else {
+			// Handle local file path
+			try {
+				data = await Bun.file(source)
+					.arrayBuffer()
+					.then((buf) => new Uint8Array(buf));
+				ext = source.split(".").pop() || "jpg";
+				mediaType = this.getMediaTypeFromExt(ext);
+			} catch (error) {
+				throw new Error(
+					`Failed to read cover image file: ${(error as Error).message}`,
+				);
+			}
+		}
+
+		// Create a unique ID for the cover
+		const coverId = "cover-image";
+		const coverFilename = `cover.${ext}`;
+
+		// Add image to EPUB
+		this.addImage(coverId, coverFilename, data, mediaType);
+
+		// Update metadata to reference this cover image
+		this.metadata.cover = coverId;
+
+		return coverId;
+	}
+
+	/**
 	 * Adds a chapter (HTML content file) to the EPUB
 	 * @param title - The title of the chapter
 	 * @param html - The HTML content
@@ -426,13 +496,13 @@ class Epub {
 		// Make sure we have directories for all item paths
 		const dirs = new Set<string>();
 
-		this.items.forEach((item) => {
+		for (const item of this.items) {
 			const path = item.href.split("/");
 			path.pop(); // Remove filename
 			if (path.length > 0) {
 				dirs.add(path.join("/"));
 			}
-		});
+		}
 	}
 
 	/**

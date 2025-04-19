@@ -60,6 +60,8 @@ test("Create EPUB book", async () => {
 	);
 	book.addImage("img1", "sample.png", sampleImageData, "image/png");
 
+	await book.addCover("https://marketplace.canva.com/EAFRb-xbE6E/1/0/512w/canva-ws-green-and-blue-bold-and-bright-retro-chic-romance-wattpad-book-cover-WFLoYonc8rM.jpg")
+
 	try {
 		// Save the EPUB file
 		await book.save(outputPath);
