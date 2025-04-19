@@ -126,7 +126,18 @@ class Epub {
 			.replace(/<img([^>]*?)(?<!\/)>/g, "<img$1 />")
 			.replace(/<br([^>]*?)(?<!\/)>/g, "<br$1 />");
 
+		// Escape any bare & into &amp; (but keep valid entities)
+		content = content.replace(/&(?!([A-Za-z]+|#\d+);)/g, "&amp;");
+
 		return content;
+	}
+
+	// escape bare & and XML‑special chars
+	private escapeXml(str: string): string {
+		return str
+			.replace(/&(?!([A-Za-z]+|#\d+);)/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;");
 	}
 
 	/**
@@ -156,7 +167,7 @@ class Epub {
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${this.metadata.language}">
 <head>
   <meta charset="UTF-8" />
-  <title>${title}</title>
+  <title>${this.escapeXml(title)}</title>
   ${this.cssFiles
 		.map((css) => `<link rel="stylesheet" type="text/css" href="../${css}"/>`)
 		.join("\n  ")}
@@ -430,6 +441,13 @@ class Epub {
 	 * @private
 	 */
 	private generateNav(): string {
+		// escapeXml helper to sanitize labels
+		const escapeXml = (str: string) =>
+			str
+				.replace(/&(?!([A-Za-z]+|#\d+);)/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;");
+
 		const renderToc = (navPoints: NavPoint[]): string => {
 			if (navPoints.length === 0) {
 				// Find the first available chapter
@@ -449,7 +467,7 @@ class Epub {
 					.map(
 						(np) => `
           <li>
-            <a href="${np.content}">${np.label}</a>
+            <a href="${np.content}">${escapeXml(np.label)}</a>
             ${np.children ? renderToc(np.children) : ""}
           </li>
         `,
