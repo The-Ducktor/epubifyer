@@ -1,34 +1,6 @@
-import * as cheerio from "cheerio";
+import { DOMParser } from "@b-fuze/deno-dom";
 import JSZip from "jszip";
-
-// Types for EPUB metadata and content items
-type EpubMetadata = {
-	title: string;
-	creator: string;
-	language: string;
-	identifier: string;
-	date?: string;
-	publisher?: string;
-	description?: string;
-	rights?: string;
-	cover?: string; // ID of cover image
-};
-
-type EpubItem = {
-	id: string;
-	href: string;
-	mediaType: string;
-	properties?: string;
-	content: string | Uint8Array;
-};
-
-type NavPoint = {
-	id: string;
-	label: string;
-	content: string;
-	children?: NavPoint[];
-};
-
+import type { EpubItem, EpubMetadata, NavPoint } from "./types";
 class Epub {
 	private metadata: EpubMetadata;
 	private items: EpubItem[];
@@ -72,117 +44,253 @@ class Epub {
 			return v.toString(16);
 		});
 	}
+	private isurl(str: string): boolean {
+		const pattern = new RegExp(
+			"^(https?:\\/\\/)?" + // protocol
+				"((([a-z\\d]([a-z\\d-]*[a-z\\d])?)\\.)+[a-z]{2,}|" + // domain name
+				"localhost|" + // localhost
+				"\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|" + // OR ipv4
+				"\\[([a-f\\d]{1,4}:){7}[a-f\\d]{1,4}\\])" + // OR ipv6
+				"(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*" + // port and path
+				"(\\?[;&a-z\\d%_.~+=-]*)?" + // query string
+				"(\\#[-a-z\\d_]*)?$",
+			"i",
+		); // fragment locator
+		return !!pattern.test(str);
+	}
+
+	private async imageProcessing(html: string): Promise<string> {
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(html, "text/html");
+		if (!doc) return html;
+
+		// Handle images
+		const images = doc.querySelectorAll("img");
+		for (const img of images) {
+			const srcset = img.getAttribute("srcset");
+			let chosenUrl: string | null = null;
+
+			if (srcset) {
+				const candidates = srcset.split(",").map((entry) => {
+					const [url, size] = entry.trim().split(/\s+/);
+					const width = size && size.endsWith("w") ? parseInt(size) : 0;
+					return { url, width };
+				});
+				candidates.sort((a, b) => b.width - a.width);
+				chosenUrl = candidates[0]?.url || null;
+			}
+
+			if (!chosenUrl) {
+				chosenUrl = img.getAttribute("src");
+			}
+
+			if (this.isurl(chosenUrl || "")) {
+				try {
+					const response = await fetch(chosenUrl!);
+					if (!response.ok) continue;
+					const data = new Uint8Array(await response.arrayBuffer());
+					const ext = chosenUrl?.split(".").pop()?.split("?")[0] || "img";
+					const mediaType = this.getMediaTypeFromExt(ext);
+					const id = `img_${++this.uniqueIdCount}.${ext}`;
+					const epubImagePath = `images/image_${id}`;
+					this.addImage(id, `image_${id}`, data, mediaType);
+					// Set correct relative path for <img src> in chapter XHTML
+					img.setAttribute("src", `../images/image_${id}`);
+					img.removeAttribute("srcset");
+				} catch {
+					// Ignore fetch errors, leave image as is
+				}
+			}
+
+			// Remove width/height attributes (not allowed in EPUB 3.3 for <img>)
+			img.removeAttribute("width");
+			img.removeAttribute("height");
+		}
+
+		// Remove width/height attributes from all elements (not allowed in EPUB 3.3)
+		const allElements = doc.querySelectorAll("*");
+		for (const element of allElements) {
+			element.removeAttribute("width");
+			element.removeAttribute("height");
+		}
+
+		// Only return the inner HTML of the <body> to avoid nested <html> tags
+		const body = doc.querySelector("body");
+		let content = body ? body.innerHTML : html;
+
+		// Replace &nbsp; with Unicode non-breaking space to avoid undeclared entity errors
+		content = content.replace(/&nbsp;/g, "\u00A0");
+
+		// Self-close <img> and <br> tags for XHTML compliance
+		content = content
+			.replace(/<img([^>]*?)(?<!\/)>/g, "<img$1 />")
+			.replace(/<br([^>]*?)(?<!\/)>/g, "<br$1 />");
+
+		// Escape any bare & into &amp; (but keep valid entities)
+		content = content.replace(/&(?!([A-Za-z]+|#\d+);)/g, "&amp;");
+
+		return content;
+	}
+
+	// escape bare & and XML‑special chars
+	private escapeXml(str: string): string {
+		return str
+			.replace(/&(?!([A-Za-z]+|#\d+);)/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;");
+	}
+
+	/**
+	 * Adds a cover image to the EPUB
+	 * @param source - Path to image file, URL, or base64-encoded image data
+	 * @returns Promise resolving to the ID of the added cover image
+	 */
+	async addCover(source: string): Promise<string> {
+		let data: Uint8Array;
+		let mediaType: string;
+		let ext: string;
+
+		// Process based on source type
+		if (source.startsWith("data:")) {
+			// Handle base64 data URI
+			const match = source.match(/^data:([^;]+);base64,(.+)$/);
+			if (!match) {
+				throw new Error("Invalid base64 data URI format");
+			}
+			mediaType = match[1];
+			ext = this.getExtFromMediaType(mediaType);
+			data = new Uint8Array(Buffer.from(match[2], "base64"));
+		} else if (this.isurl(source)) {
+			// Handle URL
+			try {
+				const response = await fetch(source);
+				if (!response.ok) {
+					throw new Error(`Failed to fetch image: ${response.statusText}`);
+				}
+				data = new Uint8Array(await response.arrayBuffer());
+				// Try to determine media type from Content-Type header or URL extension
+				const contentType = response.headers.get("Content-Type");
+				if (contentType?.startsWith("image/")) {
+					mediaType = contentType;
+					ext = this.getExtFromMediaType(mediaType);
+				} else {
+					ext = source.split(".").pop()?.split("?")[0] || "jpg";
+					mediaType = this.getMediaTypeFromExt(ext);
+				}
+			} catch (error) {
+				throw new Error(
+					`Failed to fetch cover image: ${(error as Error).message}`,
+				);
+			}
+		} else {
+			// Handle local file path
+			try {
+				data = await Bun.file(source)
+					.arrayBuffer()
+					.then((buf) => new Uint8Array(buf));
+				ext = source.split(".").pop() || "jpg";
+				mediaType = this.getMediaTypeFromExt(ext);
+			} catch (error) {
+				throw new Error(
+					`Failed to read cover image file: ${(error as Error).message}`,
+				);
+			}
+		}
+
+		// Create a unique ID for the cover
+		const coverId = "cover-image";
+		const coverFilename = `cover.${ext}`;
+
+		// Add image to EPUB
+		this.addImage(coverId, coverFilename, data, mediaType);
+
+		// Update metadata to reference this cover image
+		this.metadata.cover = coverId;
+
+		return coverId;
+	}
 
 	/**
 	 * Adds a chapter (HTML content file) to the EPUB
 	 * @param title - The title of the chapter
-	 * @param html - The HTML content
+	 * @param html - The HTML content or an array of [order, content] tuples for multiple HTML files
 	 * @param id - Optional ID for the chapter (generated if not provided)
 	 * @returns The ID of the added chapter
 	 */
 	async addChapter(
 		title: string,
-		html: string,
+		html: string | Array<[number, string]> | Array<string>,
 		id: string = "",
 	): Promise<string> {
-		// Create unique ID if not provided
+		// Create base ID if not provided
 		if (!id) {
 			id = `chapter_${++this.uniqueIdCount}`;
 		}
 
-		const href = `text/${id}.xhtml`;
-
-		// Parse HTML with Cheerio - setting xmlMode to true ensures proper XML handling
-		const $ = cheerio.load(html, { xmlMode: true });
-
-		const imgPromises: Promise<void>[] = [];
-		$("img").each((_, el) => {
-			const src = $(el).attr("src");
-			if (!src) return;
-
-			// Remote image (http/https)
-			if (/^https?:\/\//i.test(src)) {
-				const url = src;
-				const ext = url.split(".").pop()?.split(/\#|\?/)[0] || "img";
-				const imgId = `img_${this.uniqueIdCount++}`;
-				const filename = `${imgId}.${ext}`;
-				const localHref = `images/${filename}`;
-				const mediaType = this.getMediaTypeFromExt(ext);
-
-				const p = fetch(url)
-					.then(async (res) => {
-						if (!res.ok) throw new Error(`Failed to fetch image: ${url}`);
-						const buf = new Uint8Array(await res.arrayBuffer());
-						this.addImage(imgId, filename, buf, mediaType);
-						$(el).attr("src", `../${localHref}`);
-					})
-					.catch(() => {
-						// If fetch fails, leave src as is
-					});
-				imgPromises.push(p);
-			}
-			// Data URL image
-			else if (/^data:image\/([a-zA-Z0-9.+-]+);base64,/.test(src)) {
-				const match = src.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
-				if (match) {
-					const mediaType = match[1];
-					const data = match[2];
-					const buf = Uint8Array.from(Buffer.from(data, "base64"));
-					const ext = this.getExtFromMediaType(mediaType);
-					const imgId = `img_${this.uniqueIdCount++}`;
-					const filename = `${imgId}.${ext}`;
-					this.addImage(imgId, filename, buf, mediaType);
-					$(el).attr("src", `../images/${filename}`);
+		let partHtmls: string[];
+		if (Array.isArray(html)) {
+			// Support both [order, html] tuples and plain html array
+			if (
+				html.length > 0 &&
+				Array.isArray(html[0]) &&
+				(html[0] as any).length === 2 &&
+				typeof (html[0] as any)[0] === "number"
+			) {
+				const sorted = (html as Array<[number, string]>)
+					.slice()
+					.sort((a, b) => a[0] - b[0]);
+				partHtmls = [];
+				for (const [, htmlPart] of sorted) {
+					partHtmls.push(await this.imageProcessing(htmlPart));
+				}
+			} else {
+				partHtmls = [];
+				for (const htmlPart of html as Array<string>) {
+					partHtmls.push(await this.imageProcessing(htmlPart));
 				}
 			}
-			// Already local, do nothing
-		});
-
-		await Promise.all(imgPromises);
-
-		// Prepare properly formatted XHTML content
-		let bodyContent: string;
-
-		// Extract content or use the whole document
-		if (!html.includes("<!DOCTYPE html>") && !html.includes("<html")) {
-			// It's a fragment, wrap the content in a div to preserve namespaces
-			bodyContent = $.html();
 		} else {
-			// It has HTML structure already, extract the body content
-			bodyContent = $("body").html() || html;
+			partHtmls = [await this.imageProcessing(html)];
 		}
 
-		// Create a properly formatted XHTML document with correct namespaces
-		const finalHtml = `<?xml version="1.0" encoding="UTF-8"?>
+		const partIds: string[] = [];
+		const partHrefs: string[] = [];
+		for (let i = 0; i < partHtmls.length; ++i) {
+			const partId = partHtmls.length === 1 ? id : `${id}_part${i + 1}`;
+			const href = `text/${partId}.xhtml`;
+			const finalHtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${this.metadata.language}">
 <head>
   <meta charset="UTF-8" />
-  <title>${title}</title>
-  ${this.cssFiles.map((css) => `<link rel="stylesheet" type="text/css" href="../${css}"/>`).join("\n  ")}
+  <title>${this.escapeXml(title)}${partHtmls.length > 1 ? ` (Part ${i + 1})` : ""}</title>
+  ${this.cssFiles
+		.map((css) => `<link rel="stylesheet" type="text/css" href="../${css}"/>`)
+		.join("\n  ")}
 </head>
 <body>
-  ${bodyContent}
+  ${partHtmls[i]}
 </body>
 </html>`;
+			this.items.push({
+				id: partId,
+				href,
+				mediaType: "application/xhtml+xml",
+				content: finalHtml,
+			});
+			this.spine.push(partId);
+			partIds.push(partId);
+			partHrefs.push(href);
+		}
 
-		this.items.push({
-			id,
-			href,
-			mediaType: "application/xhtml+xml",
-			content: finalHtml,
-		});
-
-		this.spine.push(id);
-
-		// Add to table of contents
+		// Only add a single TOC entry for the chapter, pointing to the first part
 		this.toc.push({
-			id,
+			id: partIds[0],
 			label: title,
-			content: href,
+			content: partHrefs[0],
 		});
 
-		return id;
+		return partIds[0];
 	}
 
 	// Helper: get media type from extension
@@ -339,12 +447,12 @@ class Epub {
 		];
 
 		// Add all items to manifest
-		this.items.forEach((item) => {
+		for (const item of this.items) {
 			const props = item.properties ? ` properties="${item.properties}"` : "";
 			manifestItems.push(
 				`<item id="${item.id}" href="${item.href}" media-type="${item.mediaType}"${props}/>`,
 			);
-		});
+		}
 
 		// Create proper directory structure
 		this.ensureDirectoriesExist();
@@ -374,11 +482,29 @@ class Epub {
     <dc:creator>${this.metadata.creator}</dc:creator>
     <dc:language>${this.metadata.language}</dc:language>
     <dc:date>${this.metadata.date}</dc:date>
-    ${this.metadata.publisher ? `<dc:publisher>${this.metadata.publisher}</dc:publisher>` : ""}
-    ${this.metadata.description ? `<dc:description>${this.metadata.description}</dc:description>` : ""}
-    ${this.metadata.rights ? `<dc:rights>${this.metadata.rights}</dc:rights>` : ""}
-    <meta property="dcterms:modified">${new Date().toISOString().replace(/\.\d+Z/, "Z")}</meta>
-    ${this.metadata.cover ? `<meta name="cover" content="${this.metadata.cover}"/>` : ""}
+    ${
+			this.metadata.publisher
+				? `<dc:publisher>${this.metadata.publisher}</dc:publisher>`
+				: ""
+		}
+    ${
+			this.metadata.description
+				? `<dc:description>${this.metadata.description}</dc:description>`
+				: ""
+		}
+    ${
+			this.metadata.rights
+				? `<dc:rights>${this.metadata.rights}</dc:rights>`
+				: ""
+		}
+    <meta property="dcterms:modified">${new Date()
+			.toISOString()
+			.replace(/\.\d+Z/, "Z")}</meta>
+    ${
+			this.metadata.cover
+				? `<meta name="cover" content="${this.metadata.cover}"/>`
+				: ""
+		}
   </metadata>
   <manifest>
     ${manifestItems.join("\n    ")}
@@ -397,13 +523,13 @@ class Epub {
 		// Make sure we have directories for all item paths
 		const dirs = new Set<string>();
 
-		this.items.forEach((item) => {
+		for (const item of this.items) {
 			const path = item.href.split("/");
 			path.pop(); // Remove filename
 			if (path.length > 0) {
 				dirs.add(path.join("/"));
 			}
-		});
+		}
 	}
 
 	/**
@@ -412,6 +538,13 @@ class Epub {
 	 * @private
 	 */
 	private generateNav(): string {
+		// escapeXml helper to sanitize labels
+		const escapeXml = (str: string) =>
+			str
+				.replace(/&(?!([A-Za-z]+|#\d+);)/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;");
+
 		const renderToc = (navPoints: NavPoint[]): string => {
 			if (navPoints.length === 0) {
 				// Find the first available chapter
@@ -431,7 +564,7 @@ class Epub {
 					.map(
 						(np) => `
           <li>
-            <a href="${np.content}">${np.label}</a>
+            <a href="${np.content}">${escapeXml(np.label)}</a>
             ${np.children ? renderToc(np.children) : ""}
           </li>
         `,
@@ -485,18 +618,18 @@ class Epub {
 
 		// Create directories first
 		const dirs = new Set<string>();
-		this.items.forEach((item) => {
+		for (const item of this.items) {
 			const path = item.href.split("/");
 			path.pop(); // Remove filename
 			if (path.length > 0) {
 				dirs.add(path.join("/"));
 			}
-		});
+		}
 
 		// Ensure directories exist
-		dirs.forEach((dir) => {
+		for (const dir of dirs) {
 			zip.folder(`EPUB/${dir}`);
-		});
+		}
 
 		// Add all items
 		for (const item of this.items) {
