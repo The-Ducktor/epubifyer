@@ -3,13 +3,13 @@
   "module": "dist/index.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "A tool to convert EPUB files to a more web-friendly format.",
   "author": "The Ducktor",
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index      bun add -d semver.d.ts",
+      "types": "./dist/index",
       "import": "./dist/index.js"
     }
   },
@@ -18,8 +18,7 @@
     "README.md"
   ],
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/jsdom": "^21.1.7"
+    "@types/bun": "latest"
   },
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --minify --target=bun && tsc --emitDeclarationOnly --declaration --outDir dist",
@@ -32,9 +31,6 @@
   },
   "dependencies": {
     "@b-fuze/deno-dom": "npm:@jsr/b-fuze__deno-dom@^0.1.49",
-    "@types/dompurify": "^3.2.0",
-    "dompurify": "^3.2.5",
-    "jsdom": "^26.1.0",
     "jszip": "^3.10.1"
   },
   "repository": {
@@ -45,5 +41,6 @@
     "epub",
     "converter",
     "ebook"
-  ]
+  ],
+  "license": "MIT"
 }
