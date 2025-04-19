@@ -52,8 +52,8 @@ test("Create EPUB book", async () => {
 
 	// Add a multi-HTML chapter (array of [order, content])
 	await book.addChapter("Appendix 3", [
-		[2, `<h2>Appendix B</h2><p>This is the second appendix section.</p>`],
-		[1, `<h2>Appendix A</h2><p>This is the first appendix section.</p>`],
+		[2, "<h2>Appendix B</h2><p>This is the second appendix section.</p>"],
+		[1, "<h2>Appendix A</h2><p>This is the first appendix section.</p>"],
 	]);
 
 	await book.addChapter("no spec order", [
