@@ -50,6 +50,26 @@ test("Create EPUB book", async () => {
   `,
 	);
 
+	// Add a multi-HTML chapter (array of [order, content])
+	await book.addChapter("Appendix 3", [
+		[2, `<h2>Appendix B</h2><p>This is the second appendix section.</p>`],
+		[1, `<h2>Appendix A</h2><p>This is the first appendix section.</p>`],
+	]);
+
+	await book.addChapter("no spec order", [
+		"<h2>Appendix B</h2><p>This is the first appendix section.</p>",
+		"<h2>Appendix A</h2><p>This is the second appendix section.</p>",
+	]);
+
+	await book.addChapter(
+		"Chapter 4",
+		`
+    <h1>Creating EPUB Files</h1>
+    <p>EPUB files are essentially ZIP files that contain HTML, CSS, and image files, along with metadata.</p>
+    <p>The EPUBifyer library makes it easy to create these files without worrying about the underlying structure.</p>
+  `,
+	);
+
 	// Add an image (you would normally read this from a file)
 	// For demo purposes, we're using a small Base64 encoded transparent PNG
 	const sampleImageData = Uint8Array.from(
@@ -60,7 +80,9 @@ test("Create EPUB book", async () => {
 	);
 	book.addImage("img1", "sample.png", sampleImageData, "image/png");
 
-	await book.addCover("https://marketplace.canva.com/EAFRb-xbE6E/1/0/512w/canva-ws-green-and-blue-bold-and-bright-retro-chic-romance-wattpad-book-cover-WFLoYonc8rM.jpg")
+	await book.addCover(
+		"https://marketplace.canva.com/EAFRb-xbE6E/1/0/512w/canva-ws-green-and-blue-bold-and-bright-retro-chic-romance-wattpad-book-cover-WFLoYonc8rM.jpg",
+	);
 
 	try {
 		// Save the EPUB file
@@ -125,7 +147,6 @@ test("Validate EPUB with epubcheck", async () => {
 			}
 
 			// Delete the temp file
-			
 
 			// Assert no errors or fatals
 			expect(json.checker.nError).toBe(0);

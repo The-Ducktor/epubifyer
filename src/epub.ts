@@ -213,57 +213,84 @@ class Epub {
 	/**
 	 * Adds a chapter (HTML content file) to the EPUB
 	 * @param title - The title of the chapter
-	 * @param html - The HTML content
+	 * @param html - The HTML content or an array of [order, content] tuples for multiple HTML files
 	 * @param id - Optional ID for the chapter (generated if not provided)
 	 * @returns The ID of the added chapter
 	 */
 	async addChapter(
 		title: string,
-		html: string,
+		html: string | Array<[number, string]> | Array<string>,
 		id: string = "",
 	): Promise<string> {
-		// Create unique ID if not provided
+		// Create base ID if not provided
 		if (!id) {
 			id = `chapter_${++this.uniqueIdCount}`;
 		}
 
-		const href = `text/${id}.xhtml`;
+		let partHtmls: string[];
+		if (Array.isArray(html)) {
+			// Support both [order, html] tuples and plain html array
+			if (
+				html.length > 0 &&
+				Array.isArray(html[0]) &&
+				(html[0] as any).length === 2 &&
+				typeof (html[0] as any)[0] === "number"
+			) {
+				const sorted = (html as Array<[number, string]>)
+					.slice()
+					.sort((a, b) => a[0] - b[0]);
+				partHtmls = [];
+				for (const [, htmlPart] of sorted) {
+					partHtmls.push(await this.imageProcessing(htmlPart));
+				}
+			} else {
+				partHtmls = [];
+				for (const htmlPart of html as Array<string>) {
+					partHtmls.push(await this.imageProcessing(htmlPart));
+				}
+			}
+		} else {
+			partHtmls = [await this.imageProcessing(html)];
+		}
 
-		// Process images and parse HTML, just wrap as XHTML
-		const bodyContent = await this.imageProcessing(html);
-
-		const finalHtml = `<?xml version="1.0" encoding="UTF-8"?>
+		const partIds: string[] = [];
+		const partHrefs: string[] = [];
+		for (let i = 0; i < partHtmls.length; ++i) {
+			const partId = partHtmls.length === 1 ? id : `${id}_part${i + 1}`;
+			const href = `text/${partId}.xhtml`;
+			const finalHtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${this.metadata.language}">
 <head>
   <meta charset="UTF-8" />
-  <title>${this.escapeXml(title)}</title>
+  <title>${this.escapeXml(title)}${partHtmls.length > 1 ? ` (Part ${i + 1})` : ""}</title>
   ${this.cssFiles
 		.map((css) => `<link rel="stylesheet" type="text/css" href="../${css}"/>`)
 		.join("\n  ")}
 </head>
 <body>
-  ${bodyContent}
+  ${partHtmls[i]}
 </body>
 </html>`;
+			this.items.push({
+				id: partId,
+				href,
+				mediaType: "application/xhtml+xml",
+				content: finalHtml,
+			});
+			this.spine.push(partId);
+			partIds.push(partId);
+			partHrefs.push(href);
+		}
 
-		this.items.push({
-			id,
-			href,
-			mediaType: "application/xhtml+xml",
-			content: finalHtml,
-		});
-
-		this.spine.push(id);
-
-		// Add to table of contents
+		// Only add a single TOC entry for the chapter, pointing to the first part
 		this.toc.push({
-			id,
+			id: partIds[0],
 			label: title,
-			content: href,
+			content: partHrefs[0],
 		});
 
-		return id;
+		return partIds[0];
 	}
 
 	// Helper: get media type from extension
