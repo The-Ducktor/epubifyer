@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "version": "0.1.0",
-  "description": "A tool to convert EPUB files to a more web-friendly format.",
+  "description": "A tool to convert html and css to compliant ePub 3 files.",
   "author": "The Ducktor",
   "type": "module",
   "exports": {
