@@ -1,6 +1,8 @@
 import { DOMParser } from "@b-fuze/deno-dom";
 import JSZip from "jszip";
+import { convertHtmlToXhtml } from "./htmltoxhtml";
 import type { EpubItem, EpubMetadata, NavPoint } from "./types";
+
 class Epub {
 	private metadata: EpubMetadata;
 	private items: EpubItem[];
@@ -73,7 +75,7 @@ class Epub {
 			if (srcset) {
 				const candidates = srcset.split(",").map((entry) => {
 					const [url, size] = entry.trim().split(/\s+/);
-					const width = size && size.endsWith("w") ? parseInt(size) : 0;
+					const width = size?.endsWith("w") ? Number.parseInt(size) : 0;
 					return { url, width };
 				});
 				candidates.sort((a, b) => b.width - a.width);
@@ -94,7 +96,6 @@ class Epub {
 					const id = `img_${++this.uniqueIdCount}.${ext}`;
 					const epubImagePath = `images/image_${id}`;
 					this.addImage(id, `image_${id}`, data, mediaType);
-					// Set correct relative path for <img src> in chapter XHTML
 					img.setAttribute("src", `../images/image_${id}`);
 					img.removeAttribute("srcset");
 				} catch {
@@ -102,34 +103,22 @@ class Epub {
 				}
 			}
 
-			// Remove width/height attributes (not allowed in EPUB 3.3 for <img>)
 			img.removeAttribute("width");
 			img.removeAttribute("height");
 		}
 
-		// Remove width/height attributes from all elements (not allowed in EPUB 3.3)
+		// Remove width/height attributes from all elements
 		const allElements = doc.querySelectorAll("*");
 		for (const element of allElements) {
 			element.removeAttribute("width");
 			element.removeAttribute("height");
 		}
 
-		// Only return the inner HTML of the <body> to avoid nested <html> tags
 		const body = doc.querySelector("body");
-		let content = body ? body.innerHTML : html;
+		const content = body ? body.innerHTML : html;
 
-		// Replace &nbsp; with Unicode non-breaking space to avoid undeclared entity errors
-		content = content.replace(/&nbsp;/g, "\u00A0");
-
-		// Self-close <img> and <br> tags for XHTML compliance
-		content = content
-			.replace(/<img([^>]*?)(?<!\/)>/g, "<img$1 />")
-			.replace(/<br([^>]*?)(?<!\/)>/g, "<br$1 />");
-
-		// Escape any bare & into &amp; (but keep valid entities)
-		content = content.replace(/&(?!([A-Za-z]+|#\d+);)/g, "&amp;");
-
-		return content;
+		// Convert the processed HTML to valid XHTML
+		return convertHtmlToXhtml(content);
 	}
 
 	// escape bare & and XML‑special chars
@@ -258,20 +247,20 @@ class Epub {
 		for (let i = 0; i < partHtmls.length; ++i) {
 			const partId = partHtmls.length === 1 ? id : `${id}_part${i + 1}`;
 			const href = `text/${partId}.xhtml`;
-			const finalHtml = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html>
+			const finalHtml = `<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${this.metadata.language}">
-<head>
-  <meta charset="UTF-8" />
-  <title>${this.escapeXml(title)}${partHtmls.length > 1 ? ` (Part ${i + 1})` : ""}</title>
-  ${this.cssFiles
-		.map((css) => `<link rel="stylesheet" type="text/css" href="../${css}"/>`)
-		.join("\n  ")}
-</head>
-<body>
-  ${partHtmls[i]}
-</body>
+  <head>
+    <meta charset="UTF-8"/>
+    <title>${this.escapeXml(title)}${partHtmls.length > 1 ? ` (Part ${i + 1})` : ""}</title>
+    ${this.cssFiles
+			.map((css) => `<link rel="stylesheet" type="text/css" href="../${css}"/>`)
+			.join("\n    ")}
+  </head>
+  <body>
+${partHtmls[i]}
+  </body>
 </html>`;
+
 			this.items.push({
 				id: partId,
 				href,
