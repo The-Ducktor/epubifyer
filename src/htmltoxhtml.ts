@@ -1,81 +1,41 @@
-import { DOMParser, Element, Node, Text } from "@b-fuze/deno-dom";
+import { DOMParser, XMLSerializer } from "xmldom";
 
-function fixText(text: string): string {
-	return String(text)
-		.replace(/\n{2,}/g, "\n")
-		.replace(/&(?!([a-zA-Z]+|#[0-9]+);)/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/\u00A0/g, "&#160;"); // Use numeric entity for nbsp
-}
-
-function fixAttribute(text: string): string {
-	return String(text)
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/\u00A0/g, "&#160;"); // Use numeric entity for nbsp
-}
-
+/**
+ * Converts HTML to well-formed XHTML using xmldom's DOMParser and XMLSerializer.
+ * This approach is more robust and standards-compliant than manual string manipulation.
+ *
+ * @param html The HTML string to convert.
+ * @returns XHTML string.
+ */
 export function convertHtmlToXhtml(html: string): string {
+	// Parse the HTML string into a DOM Document
 	const parser = new DOMParser();
+	// "text/html" parsing in xmldom is limited, so "text/xml" is more strict, but for best HTML support, "text/html" is used here.
+	// If HTML is not well-formed, you may get better results with "text/xml".
 	const doc = parser.parseFromString(html, "text/html");
-	if (!doc) {
-		throw new Error("Failed to parse HTML");
-	}
+	if (!doc) throw new Error("Failed to parse HTML");
 
-	function processNode(node: Node): string {
-		switch (node.nodeType) {
-			case node.TEXT_NODE:
-				return fixText((node as Text).data || "");
+	// Find the body element (if present) and serialize only its children,
+	// or serialize the whole document if you want the full XHTML output.
+	const body = doc.getElementsByTagName("body")[0];
 
-			case node.ELEMENT_NODE: {
-				const elem = node as Element;
-				const tag = elem.tagName.toLowerCase();
+	// Prepare the XMLSerializer
+	const serializer = new XMLSerializer();
 
-				// Start tag
-				let result = `<${tag}`;
-
-				// Add attributes
-				for (const attr of Array.from(elem.attributes)) {
-					result += ` ${attr.name}="${fixAttribute(attr.value)}"`;
-				}
-
-				// Handle self-closing tags
-				if (
-					/^(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i.test(
-						tag,
-					)
-				) {
-					return result + " />";
-				}
-
-				result += ">";
-
-				// Process children
-				if (elem.childNodes) {
-					for (const child of Array.from(elem.childNodes)) {
-						result += processNode(child);
-					}
-				}
-
-				// End tag
-				return result + `</${tag}>`;
-			}
-
-			default:
-				return "";
+	// Serialize the body content as XHTML (children only) or the whole document
+	if (body) {
+		let xhtml = "";
+		for (let i = 0; i < body.childNodes.length; i++) {
+			xhtml += serializer.serializeToString(body.childNodes[i]);
+			if (i < body.childNodes.length - 1) xhtml += "\n";
 		}
+		return xhtml.trim();
 	}
-
-	const body = doc.querySelector("body");
-	if (!body) {
-		throw new Error("No body element found");
-	}
-
-	// Use type assertion for body.childNodes since we know it exists
-	return Array.from(body.childNodes as ArrayLike<Node>)
-		.map((node) => processNode(node))
-		.join("\n");
+	// Fallback: serialize the whole document
+	return serializer.serializeToString(doc).trim();
 }
+
+// Example usage
+// const html = `<div><img src="test.jpg"><br>Some & text</div>`;
+// const xhtml = convertHtmlToXhtml(html);
+// console.log(xhtml);

@@ -31,7 +31,8 @@
   },
   "dependencies": {
     "@b-fuze/deno-dom": "npm:@jsr/b-fuze__deno-dom@^0.1.49",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "xmldom": "^0.6.0"
   },
   "repository": {
     "type": "git",
