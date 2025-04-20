@@ -1,7 +1,7 @@
 import { DOMParser } from "@b-fuze/deno-dom";
 import JSZip from "jszip";
-import type { EpubItem, EpubMetadata, NavPoint } from "./types";
 import { convertHtmlToXhtml } from "./htmltoxhtml";
+import type { EpubItem, EpubMetadata, NavPoint } from "./types";
 
 class Epub {
 	private metadata: EpubMetadata;
@@ -75,7 +75,7 @@ class Epub {
 			if (srcset) {
 				const candidates = srcset.split(",").map((entry) => {
 					const [url, size] = entry.trim().split(/\s+/);
-					const width = size && size.endsWith("w") ? parseInt(size) : 0;
+					const width = size?.endsWith("w") ? Number.parseInt(size) : 0;
 					return { url, width };
 				});
 				candidates.sort((a, b) => b.width - a.width);
