@@ -9,6 +9,8 @@ type EpubMetadata = {
 	description?: string;
 	rights?: string;
 	cover?: string; // ID of cover image
+	tags?: string[]; // Array of tags/subjects for categorization
+	contributor?: string
 };
 
 type EpubItem = {
@@ -27,4 +29,3 @@ type NavPoint = {
 };
 
 export type { EpubItem, EpubMetadata, NavPoint };
-   

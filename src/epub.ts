@@ -26,6 +26,7 @@ class Epub {
 			description: metadata.description,
 			rights: metadata.rights,
 			cover: metadata.cover,
+			tags: metadata.tags || [],
 		};
 		this.items = [];
 		this.spine = [];
@@ -39,26 +40,27 @@ class Epub {
 	 * @returns A string containing a UUID v4
 	 * @private
 	 */
-	private generateUUID(): string {
-		return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-			const r = (Math.random() * 16) | 0;
-			const v = c === "x" ? r : (r & 0x3) | 0x8;
-			return v.toString(16);
-		});
-	}
+		private generateUUID(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+        const randomValue = crypto.getRandomValues(new Uint8Array(1))[0] % 16;
+        const value = char === 'x' ? randomValue : (randomValue & 0x3) | 0x8;
+        return value.toString(16);
+    });
+}
+
+	/**
+	 * Checks if a string is a valid URL
+	 * @param str - The string to check
+	 * @returns True if the string is a valid URL, false otherwise
+	 * @private
+	 */
 	private isurl(str: string): boolean {
-		const pattern = new RegExp(
-			"^(https?:\\/\\/)?" + // protocol
-				"((([a-z\\d]([a-z\\d-]*[a-z\\d])?)\\.)+[a-z]{2,}|" + // domain name
-				"localhost|" + // localhost
-				"\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|" + // OR ipv4
-				"\\[([a-f\\d]{1,4}:){7}[a-f\\d]{1,4}\\])" + // OR ipv6
-				"(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*" + // port and path
-				"(\\?[;&a-z\\d%_.~+=-]*)?" + // query string
-				"(\\#[-a-z\\d_]*)?$",
-			"i",
-		); // fragment locator
-		return !!pattern.test(str);
+		try {
+			const url = new URL(str);
+			return ["http:", "https:", "blob:"].includes(url.protocol);
+		} catch (_) {
+			return false;
+		}
 	}
 
 	private async imageProcessing(html: string): Promise<string> {
@@ -463,6 +465,15 @@ ${partHtmls[i]}
 		if (spineItems.length === 0 && xhtmlItems.length > 0) {
 			spineItems.push(`<itemref idref="${xhtmlItems[0].id}"/>`);
 		}
+
+		// Generate tags as dc:subject elements
+		const tagsXml =
+			this.metadata.tags && this.metadata.tags.length > 0
+				? this.metadata.tags
+						.map((tag) => `<dc:subject>${this.escapeXml(tag)}</dc:subject>`)
+						.join("\n    ")
+				: "";
+
 		return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -486,6 +497,7 @@ ${partHtmls[i]}
 				? `<dc:rights>${this.metadata.rights}</dc:rights>`
 				: ""
 		}
+    ${tagsXml}
     <meta property="dcterms:modified">${new Date()
 			.toISOString()
 			.replace(/\.\d+Z/, "Z")}</meta>
