@@ -304,11 +304,15 @@ export function convertHtmlToXhtml(
 			doc.documentElement.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
 		}
 
-		return serializer.serializeToString(doc).trim();
+		const stuff = serializer.serializeToString(doc).trim();
+
+		return stuff;
 	} catch (error) {
 		console.error("Error converting HTML to XHTML:", error);
 		// Return a fallback clean version that removes problematic content
-		return `<div>${html.replace(/<\/?[^>]+(>|$)/g, "")}</div>`;
+		const returnedStuff = `<div>${html.replace(/<\/?[^>]+(>|$)/g, "")}</div>`;
+
+		return returnedStuff;
 	}
 }
 

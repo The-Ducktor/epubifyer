@@ -22,16 +22,6 @@ test("Create EPUB book", async () => {
   `,
 	);
 
-	// Add chapters
-	await book.addChapter(
-		"Introduction",
-		`
-    <h1>Introduction</h1>
-    <p>This is a sample EPUB book created with the EPUBifyer library.</p>
-    <p>It demonstrates how to create a basic EPUB3 file with multiple chapters and styling.</p>
-  `,
-	);
-
 	await book.addChapter(
 		"Chapter 1",
 		`
@@ -46,9 +36,12 @@ test("Create EPUB book", async () => {
 		`
     <h1>Creating EPUB Files</h1>
     <p>EPUB files are essentially ZIP files that contain HTML, CSS, and image files, along with metadata.</p>
+    <img src="http://devd.io:8000/hearng.jpg" />
     <p>The EPUBifyer library makes it easy to create these files without worrying about the underlying structure.</p>
   `,
 	);
+
+	
 
 	// Add a multi-HTML chapter (array of [order, content])
 	await book.addChapter("Appendix 3", [
