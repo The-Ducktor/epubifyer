@@ -63,7 +63,10 @@ class Epub {
     }
   }
 
-  private async imageProcessing(html: string): Promise<string> {
+  private async imageProcessing(
+    html: string,
+    compress = true,
+  ): Promise<string> {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
     if (!doc) return html;
@@ -73,7 +76,6 @@ class Epub {
     for (const img of images) {
       const srcset = img.getAttribute("srcset");
       let chosenUrl: string | null = null;
-     
 
       if (srcset) {
         const candidates = srcset.split(",").map((entry) => {
@@ -88,14 +90,19 @@ class Epub {
       if (!chosenUrl) {
         chosenUrl = img.getAttribute("src");
       }
-       console.log(`processing remote images "${chosenUrl}"`);
+      console.log(`processing remote images "${chosenUrl}"`);
 
       if (this.isurl(chosenUrl || "")) {
         try {
+          if (compress) {
+            const encodedUrl = encodeURIComponent(chosenUrl!);
+            chosenUrl = `https://wsrv.nl/?url=${encodedUrl}&output=jpg`;
+          }
+
           const response = await fetch(chosenUrl!);
           if (!response.ok) continue;
           const data = new Uint8Array(await response.arrayBuffer());
-          const ext = chosenUrl?.split(".").pop()?.split("?")[0] || "img";
+          const ext = "jpg"; // Since we're converting to JPG via wsrv.nl
           const mediaType = this.getMediaTypeFromExt(ext);
           const id = `img_${++this.uniqueIdCount}.${ext}`;
           const epubImagePath = `images/image_${id}`;
@@ -172,7 +179,7 @@ class Epub {
         }
       } catch (error) {
         throw new Error(
-          `Failed to fetch cover image: ${(error as Error).message}`,
+          `Failed to fetch cover image (${source}): ${(error as Error).message}`,
         );
       }
     } else {
@@ -213,7 +220,8 @@ class Epub {
   async addChapter(
     title: string,
     html: string | Array<[number, string]> | Array<string>,
-    id: string = "",
+    id = "",
+    compressIMG = true,
   ): Promise<string> {
     // Create base ID if not provided
     if (!id) {
@@ -234,12 +242,12 @@ class Epub {
           .sort((a, b) => a[0] - b[0]);
         partHtmls = [];
         for (const [, htmlPart] of sorted) {
-          partHtmls.push(await this.imageProcessing(htmlPart));
+          partHtmls.push(await this.imageProcessing(htmlPart, compressIMG));
         }
       } else {
         partHtmls = [];
         for (const htmlPart of html as Array<string>) {
-          partHtmls.push(await this.imageProcessing(htmlPart));
+          partHtmls.push(await this.imageProcessing(htmlPart, compressIMG));
         }
       }
     } else {
