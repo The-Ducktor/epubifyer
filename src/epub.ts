@@ -104,7 +104,7 @@ class Epub {
           const data = new Uint8Array(await response.arrayBuffer());
           const ext = "jpg"; // Since we're converting to JPG via wsrv.nl
           const mediaType = this.getMediaTypeFromExt(ext);
-          const id = `img_${++this.uniqueIdCount}.${ext}`;
+          const id = `img_${++this.uniqueIdCount}.${ext}`; // TODO uses seprate system for image id's so html names arn't scuffed
           const epubImagePath = `images/image_${id}`;
           this.addImage(id, `image_${id}`, data, mediaType);
           img.setAttribute("src", `../images/image_${id}`);
