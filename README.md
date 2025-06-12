@@ -9,7 +9,7 @@ into EPUB format for e-readers.
 
 ## Features
 
-- Create EPUB 3.0 compatible e-books
+- Create EPUB 3.3 compatible e-books
 - Add chapters with HTML content
 - Automatic image processing (including remote images)
 - Customizable metadata

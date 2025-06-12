@@ -215,6 +215,7 @@ class Epub {
    * @param title - The title of the chapter
    * @param html - The HTML content or an array of [order, content] tuples for multiple HTML files
    * @param id - Optional ID for the chapter (generated if not provided)
+   * @param compressIMG - Whether to compress images in the HTML content
    * @returns The ID of the added chapter
    */
   async addChapter(
