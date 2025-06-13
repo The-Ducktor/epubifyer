@@ -18,7 +18,7 @@
     "README.md"
   ],
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "^1.2.16"
   },
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target=bun && tsc --emitDeclarationOnly --declaration --outDir dist",
@@ -27,10 +27,11 @@
     "version:bump": "bunx npm version patch"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5.8.3"
   },
   "dependencies": {
     "@b-fuze/deno-dom": "npm:@jsr/b-fuze__deno-dom@^0.1.49",
+    "@types/xmldom": "^0.1.34",
     "jszip": "^3.10.1",
     "xmldom": "^0.6.0"
   },

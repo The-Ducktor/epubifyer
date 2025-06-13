@@ -1,5 +1,5 @@
-import { DOMParser as XmldomParser, XMLSerializer } from "xmldom";
 import { DOMParser as DenoDOMParser } from "@b-fuze/deno-dom";
+import { XMLSerializer, DOMParser as XmldomParser } from "xmldom";
 
 /**
  * Preprocesses HTML using Deno DOM to remove invalid attributes and elements.
@@ -209,13 +209,12 @@ function preprocessHtmlWithDenoDom(html: string): string {
 					el.parentNode.replaceChild(span, el);
 				}
 				return; // Element already processed
-			} else {
+			}
 				// If no content, remove the element
 				if (el.parentNode) {
 					el.parentNode.removeChild(el);
 				}
 				return; // Element already removed
-			}
 		}
 
 		// Clean attributes for valid elements
