@@ -1,4 +1,5 @@
 import { DOMParser as DenoDOMParser } from "@b-fuze/deno-dom";
+
 import { XMLSerializer, DOMParser as XmldomParser } from "xmldom";
 
 /**
@@ -179,13 +180,15 @@ function preprocessHtmlWithDenoDom(html: string): string {
 		],
 	};
 
-	function cleanElement(el: any) {
+	// Handle DOM element cleaning - using any due to different DOM implementations (Deno DOM vs standard DOM)
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	function cleanElement(el: any): void {
 		if (!el) return;
 
 		// Skip non-element nodes
 		if (el.nodeType !== 1) return;
 
-		const tag = el.tagName?.toLowerCase?.() ?? "";
+		const tag = (el.tagName?.toLowerCase?.() ?? "") as string;
 
 		// Handle invalid elements - replace with spans or remove
 		if (!allowedElements.has(tag)) {
@@ -210,11 +213,11 @@ function preprocessHtmlWithDenoDom(html: string): string {
 				}
 				return; // Element already processed
 			}
-				// If no content, remove the element
-				if (el.parentNode) {
-					el.parentNode.removeChild(el);
-				}
-				return; // Element already removed
+			// If no content, remove the element
+			if (el.parentNode) {
+				el.parentNode.removeChild(el);
+			}
+			return; // Element already removed
 		}
 
 		// Clean attributes for valid elements
@@ -225,7 +228,7 @@ function preprocessHtmlWithDenoDom(html: string): string {
 				const isAllowed =
 					allowedGlobalAttrs.has(name) ||
 					name.startsWith("data-") ||
-					(allowedByTag[tag] && allowedByTag[tag].includes(name));
+					allowedByTag[tag]?.includes(name);
 
 				if (!isAllowed) {
 					el.removeAttribute(name);
