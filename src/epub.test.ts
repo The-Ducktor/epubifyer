@@ -121,7 +121,7 @@ test("Validate EPUB with epubcheck", async () => {
 				"Warning: epubcheck may not be installed or accessible in PATH",
 			);
 			// Skip this test with a pending message
-			expect.skip("Skipping due to epubcheck not being available");
+			
 		} else {
 			expect(exitCode).toBe(0);
 
