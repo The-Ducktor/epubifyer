@@ -18,7 +18,7 @@
     "README.md"
   ],
   "devDependencies": {
-    "@types/bun": "^1.2.16"
+    "@types/bun": "^1.2.18"
   },
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target=bun && tsc --emitDeclarationOnly --declaration --outDir dist",
@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@b-fuze/deno-dom": "npm:@jsr/b-fuze__deno-dom@^0.1.49",
-    "@biomejs/biome": "^2.0.0",
+    "@biomejs/biome": "^2.0.6",
     "@types/xmldom": "^0.1.34",
     "jszip": "^3.10.1",
     "xmldom": "^0.6.0"
