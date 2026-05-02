@@ -41,8 +41,6 @@ test("Create EPUB book", async () => {
   `,
 	);
 
-	
-
 	// Add a multi-HTML chapter (array of [order, content])
 	await book.addChapter("Appendix 3", [
 		[2, "<h2>Appendix B</h2><p>This is the second appendix section.</p>"],
@@ -61,6 +59,25 @@ test("Create EPUB book", async () => {
     <p>EPUB files are essentially ZIP files that contain HTML, CSS, and image files, along with metadata.</p>
     <p>The EPUBifyer library makes it easy to create these files without worrying about the underlying structure.</p>
   `,
+	);
+
+	// Add a raw chapter with pre-processed full XHTML document
+	await book.addChapter(
+		"Raw Chapter",
+		`<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en">
+  <head>
+    <meta charset="UTF-8"/>
+    <title>Raw XHTML Content</title>
+  </head>
+  <body>
+    <h1>Raw XHTML Content</h1>
+    <p>This chapter uses raw full XHTML document without processing or wrapping.</p>
+  </body>
+</html>`,
+		"",
+		true, // compressIMG (ignored)
+		true, // raw
 	);
 
 	// Add an image (you would normally read this from a file)
@@ -121,7 +138,6 @@ test("Validate EPUB with epubcheck", async () => {
 				"Warning: epubcheck may not be installed or accessible in PATH",
 			);
 			// Skip this test with a pending message
-			
 		} else {
 			expect(exitCode).toBe(0);
 

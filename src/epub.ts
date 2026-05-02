@@ -218,9 +218,10 @@ class Epub {
 	/**
 	 * Adds a chapter (HTML content file) to the EPUB
 	 * @param title - The title of the chapter
-	 * @param html - The HTML content or an array of [order, content] tuples for multiple HTML files
+	 * @param html - The HTML content or an array of [order, content] tuples for multiple HTML files. For raw=true, provide full XHTML document strings.
 	 * @param id - Optional ID for the chapter (generated if not provided)
-	 * @param compressIMG - Whether to compress images in the HTML content
+	 * @param compressIMG - Whether to compress images in the HTML content (ignored if raw=true)
+	 * @param raw - Whether the HTML content is already a complete XHTML document and should be used as-is without processing or wrapping
 	 * @returns The ID of the added chapter
 	 */
 	async addChapter(
@@ -228,6 +229,7 @@ class Epub {
 		html: string | Array<[number, string]> | Array<string>,
 		id = "",
 		compressIMG = true,
+		raw = false,
 	): Promise<string> {
 		// Create base ID if not provided
 		let chapterId = id;
@@ -244,21 +246,36 @@ class Epub {
 				(html[0] as [number, string]).length === 2 &&
 				typeof (html[0] as [number, string])[0] === "number"
 			) {
-				const sorted = (html as Array<[number, string]>)
-					.slice()
-					.sort((a, b) => a[0] - b[0]);
-				partHtmls = [];
-				for (const [, htmlPart] of sorted) {
-					partHtmls.push(await this.imageProcessing(htmlPart, compressIMG));
+				if (raw) {
+					const sorted = (html as Array<[number, string]>)
+						.slice()
+						.sort((a, b) => a[0] - b[0]);
+					partHtmls = sorted.map(([, htmlPart]) => htmlPart);
+				} else {
+					const sorted = (html as Array<[number, string]>)
+						.slice()
+						.sort((a, b) => a[0] - b[0]);
+					partHtmls = [];
+					for (const [, htmlPart] of sorted) {
+						partHtmls.push(await this.imageProcessing(htmlPart, compressIMG));
+					}
 				}
 			} else {
-				partHtmls = [];
-				for (const htmlPart of html as Array<string>) {
-					partHtmls.push(await this.imageProcessing(htmlPart, compressIMG));
+				if (raw) {
+					partHtmls = html as Array<string>;
+				} else {
+					partHtmls = [];
+					for (const htmlPart of html as Array<string>) {
+						partHtmls.push(await this.imageProcessing(htmlPart, compressIMG));
+					}
 				}
 			}
 		} else {
-			partHtmls = [await this.imageProcessing(html)];
+			if (raw) {
+				partHtmls = [html];
+			} else {
+				partHtmls = [await this.imageProcessing(html)];
+			}
 		}
 
 		const partIds: string[] = [];
@@ -267,7 +284,11 @@ class Epub {
 			const partId =
 				partHtmls.length === 1 ? chapterId : `${chapterId}_part${i + 1}`;
 			const href = `text/${partId}.xhtml`;
-			const finalHtml = `<!DOCTYPE html>
+			let content: string;
+			if (raw) {
+				content = partHtmls[i];
+			} else {
+				content = `<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${this.metadata.language}">
   <head>
     <meta charset="UTF-8"/>
@@ -280,12 +301,13 @@ class Epub {
 ${partHtmls[i]}
   </body>
 </html>`;
+			}
 
 			this.items.push({
 				id: partId,
 				href,
 				mediaType: "application/xhtml+xml",
-				content: finalHtml,
+				content,
 			});
 			this.spine.push(partId);
 			partIds.push(partId);
