@@ -5,10 +5,13 @@ This directory contains the source code for the Epubifyer library, a TypeScript 
 ## Files Overview
 
 ### `index.ts`
+
 The entry point of the library. It exports the main `Epub` class for use by consumers.
 
 ### `epub.ts`
+
 The core implementation of the EPUB creation functionality. This file contains the `Epub` class, which provides methods to:
+
 - Initialize an EPUB with metadata
 - Add chapters with HTML content
 - Add cover images
@@ -19,34 +22,43 @@ The core implementation of the EPUB creation functionality. This file contains t
 The class handles the internal structure of EPUB files, including the OPF (Open Packaging Format), spine, table of contents (TOC), and manifest.
 
 ### `types.ts`
+
 Defines TypeScript types used throughout the library:
+
 - `EpubMetadata`: Metadata for the EPUB (title, creator, etc.)
 - `EpubItem`: Represents items in the EPUB (chapters, images, etc.)
 - `NavPoint`: Structure for table of contents navigation points
 
 ### `htmltoxhtml.ts`
+
 Provides functionality to convert raw HTML to well-formed XHTML compliant with EPUB 3.3 specifications. This includes:
+
 - Filtering out invalid elements and attributes
 - Ensuring proper XML structure
 - Handling EPUB-specific requirements
 
 ### `epub.test.ts`
+
 Contains tests for the EPUB creation functionality using Bun's test framework. Tests cover:
+
 - Creating a basic EPUB
 - Adding chapters, images, and covers
 - Validating the generated EPUB with epubcheck
 
 ### `test-tk-tag.ts`
+
 Additional test file, likely for testing specific components or edge cases.
 
 ## Architecture
 
 The library uses a class-based approach with the `Epub` class as the main interface. It leverages:
+
 - `jszip` for creating the ZIP-based EPUB file
 - `@b-fuze/deno-dom` and `xmldom` for HTML/XML parsing and manipulation
 - TypeScript for type safety
 
 The EPUB generation process involves:
+
 1. Collecting metadata, chapters, images, and styles
 2. Processing HTML content to ensure XHTML compliance
 3. Generating the required EPUB structure files (OPF, NCX, NAV)
@@ -74,10 +86,10 @@ import Epub from "./epub"; // or from "epubifyer" if installed
 
 // Create a new EPUB instance with metadata
 const epub = new Epub({
-    title: "My E-Book",
-    creator: "Author Name",
-    language: "en",
-    description: "A sample e-book created with Epubifyer",
+  title: "My E-Book",
+  creator: "Author Name",
+  language: "en",
+  description: "A sample e-book created with Epubifyer",
 });
 
 // Add a cover image

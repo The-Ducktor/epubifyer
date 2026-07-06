@@ -39,9 +39,9 @@ import Epub from "epubifyer";
 
 // Create a new EPUB
 const epub = new Epub({
-    title: "My First E-Book",
-    creator: "Your Name",
-    language: "en",
+  title: "My First E-Book",
+  creator: "Your Name",
+  language: "en",
 });
 
 // Add a cover image
@@ -49,8 +49,8 @@ await epub.addCover("example.com/image.jpg");
 
 // Add CSS styles
 epub.addCSS(
-    "styles",
-    `
+  "styles",
+  `
   body { 
     font-family: 'Georgia', serif; 
     line-height: 1.5;
@@ -62,8 +62,8 @@ epub.addCSS(
 
 // Add chapters
 await epub.addChapter(
-    "Chapter 1",
-    `
+  "Chapter 1",
+  `
   <h1>My First Chapter</h1>
   <p>This is the content of my first chapter.</p>
   <img src="https://example.com/image.jpg" alt="Example image" />
@@ -71,8 +71,8 @@ await epub.addChapter(
 );
 
 await epub.addChapter(
-    "Chapter 2",
-    `
+  "Chapter 2",
+  `
   <h1>My Second Chapter</h1>
   <p>This chapter has multiple sections.</p>
 `,
@@ -89,16 +89,16 @@ await epub.save("my-ebook.epub");
 ```typescript
 // Add a chapter with multiple parts (for large chapters)
 await epub.addChapter("Long Chapter", [
-    "<h1>Part 1</h1><p>Beginning of the chapter</p>",
-    "<h2>Part 2</h2><p>Continuation of the chapter</p>",
-    "<h2>Part 3</h2><p>End of the chapter</p>",
+  "<h1>Part 1</h1><p>Beginning of the chapter</p>",
+  "<h2>Part 2</h2><p>Continuation of the chapter</p>",
+  "<h2>Part 3</h2><p>End of the chapter</p>",
 ]);
 
 // Or with specific ordering
 await epub.addChapter("Ordered Chapter", [
-    [2, "<h2>This appears second</h2>"],
-    [1, "<h1>This appears first</h1>"],
-    [3, "<p>This appears third</p>"],
+  [2, "<h2>This appears second</h2>"],
+  [1, "<h1>This appears first</h1>"],
+  [3, "<p>This appears third</p>"],
 ]);
 ```
 
@@ -106,20 +106,20 @@ await epub.addChapter("Ordered Chapter", [
 
 ```typescript
 const epub = new Epub({
-    title: "Advanced E-Book",
-    creator: "Author Name",
-    language: "en",
-    publisher: "My Publishing Company",
-    description: "A detailed description of this amazing e-book",
-    rights: "Copyright © 2023 Author Name",
-    identifier: "com.example.my-ebook-id", // Custom identifier
-    date: "2023-10-15", // Publication date
+  title: "Advanced E-Book",
+  creator: "Author Name",
+  language: "en",
+  publisher: "My Publishing Company",
+  description: "A detailed description of this amazing e-book",
+  rights: "Copyright © 2023 Author Name",
+  identifier: "com.example.my-ebook-id", // Custom identifier
+  date: "2023-10-15", // Publication date
 });
 
 // Or update metadata later
 epub.setMetadata({
-    title: "Updated Title",
-    description: "New description",
+  title: "Updated Title",
+  description: "New description",
 });
 ```
 

@@ -1,324 +1,243 @@
+import { htmlToXhtml } from "html-to-xhtml";
 import { DOMParser as DenoDOMParser } from "@b-fuze/deno-dom";
 
-import { XMLSerializer, DOMParser as XmldomParser } from "xmldom";
+// ── EPUB 3.3 allowed elements ──────────────────────────────────────────────
+
+const allowedElements = new Set([
+  "a",
+  "abbr",
+  "address",
+  "area",
+  "article",
+  "aside",
+  "audio",
+  "b",
+  "bdi",
+  "bdo",
+  "blockquote",
+  "body",
+  "br",
+  "button",
+  "canvas",
+  "caption",
+  "cite",
+  "code",
+  "col",
+  "colgroup",
+  "data",
+  "datalist",
+  "dd",
+  "del",
+  "dfn",
+  "div",
+  "dl",
+  "dt",
+  "em",
+  "embed",
+  "epub:switch",
+  "fieldset",
+  "figure",
+  "figcaption",
+  "footer",
+  "form",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "head",
+  "header",
+  "hr",
+  "html",
+  "i",
+  "iframe",
+  "img",
+  "input",
+  "ins",
+  "kbd",
+  "label",
+  "legend",
+  "li",
+  "link",
+  "main",
+  "map",
+  "mark",
+  "meta",
+  "meter",
+  "nav",
+  "object",
+  "ol",
+  "optgroup",
+  "option",
+  "output",
+  "p",
+  "picture",
+  "pre",
+  "progress",
+  "q",
+  "ruby",
+  "s",
+  "samp",
+  "script",
+  "section",
+  "select",
+  "slot",
+  "small",
+  "span",
+  "strong",
+  "sub",
+  "sup",
+  "table",
+  "tbody",
+  "td",
+  "template",
+  "textarea",
+  "tfoot",
+  "th",
+  "thead",
+  "time",
+  "tr",
+  "u",
+  "ul",
+  "var",
+  "video",
+  "wbr",
+]);
+
+const allowedGlobalAttrs = new Set([
+  "id",
+  "class",
+  "lang",
+  "xml:lang",
+  "dir",
+  "title",
+  "style",
+  "epub:type",
+  "role",
+  "aria-label",
+  "aria-hidden",
+  "tabindex",
+]);
+
+const allowedByTag: Record<string, string[]> = {
+  a: ["href", "target", "rel", "download", "hreflang", "type", "ping"],
+  img: ["src", "alt", "width", "height", "loading", "decoding", "crossorigin"],
+  link: ["href", "rel", "type", "media", "sizes", "crossorigin"],
+  meta: ["name", "content", "http-equiv", "charset"],
+  script: ["src", "type", "async", "defer", "crossorigin"],
+  input: ["type", "name", "value", "checked", "placeholder", "readonly", "disabled", "required"],
+  button: ["type", "name", "value", "disabled", "form"],
+  form: ["action", "method", "enctype", "name", "target", "novalidate"],
+  iframe: ["src", "srcdoc", "name", "sandbox", "allow", "allowfullscreen", "loading"],
+};
+
+// ── EPUB sanitization ─────────────────────────────────────────────────────
 
 /**
- * Preprocesses HTML using Deno DOM to remove invalid attributes and elements.
- * Returns clean HTML string only.
- *
- * @param html - Raw HTML input.
- * @returns Cleaned HTML string (inner body content).
+ * Pre-process HTML with Deno DOM to strip elements/attributes
+ * not allowed per EPUB 3.3. Returns clean body inner HTML.
  */
-function preprocessHtmlWithDenoDom(html: string): string {
-	const denoParser = new DenoDOMParser();
-	const doc = denoParser.parseFromString(html, "text/html");
+function sanitizeHtml(html: string): string {
+  const parser = new DenoDOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  if (!doc) throw new Error("Failed to parse HTML with Deno DOM.");
 
-	if (!doc) {
-		throw new Error("Failed to parse HTML with Deno DOM.");
-	}
+  function cleanElement(el: any): void {
+    if (!el) return;
+    if (el.nodeType !== 1) return;
 
-	// Set of allowed elements in EPUB XHTML content
-	// Based on EPUB 3.3 spec and XHTML requirements
-	const allowedElements = new Set([
-		// Document elements
-		"html",
-		"head",
-		"body",
-		"meta",
-		// Section elements
-		"section",
-		"nav",
-		"article",
-		"aside",
-		"h1",
-		"h2",
-		"h3",
-		"h4",
-		"h5",
-		"h6",
-		"header",
-		"footer",
-		"address",
-		// Grouping content
-		"p",
-		"hr",
-		"pre",
-		"blockquote",
-		"ol",
-		"ul",
-		"li",
-		"dl",
-		"dt",
-		"dd",
-		"figure",
-		"figcaption",
-		"main",
-		"div",
-		// Text-level semantics
-		"a",
-		"abbr",
-		"area",
-		"audio",
-		"b",
-		"bdi",
-		"bdo",
-		"br",
-		"button",
-		"canvas",
-		"cite",
-		"code",
-		"data",
-		"datalist",
-		"del",
-		"dfn",
-		"em",
-		"embed",
-		"i",
-		"iframe",
-		"img",
-		"input",
-		"ins",
-		"kbd",
-		"label",
-		"link",
-		"map",
-		"mark",
-		"meter",
-		"object",
-		"output",
-		"picture",
-		"progress",
-		"q",
-		"ruby",
-		"s",
-		"samp",
-		"script",
-		"select",
-		"slot",
-		"small",
-		"span",
-		"strong",
-		"sub",
-		"sup",
-		"template",
-		"textarea",
-		"time",
-		"u",
-		"var",
-		"video",
-		"wbr",
-		// Table content
-		"table",
-		"caption",
-		"colgroup",
-		"col",
-		"tbody",
-		"thead",
-		"tfoot",
-		"tr",
-		"td",
-		"th",
-		// Forms
-		"form",
-		"fieldset",
-		"legend",
-		"optgroup",
-		"option",
-		// EPUB specific
-		"epub:switch",
-	]);
+    const tag = (el.tagName?.toLowerCase?.() ?? "") as string;
 
-	const allowedGlobalAttrs = new Set([
-		"id",
-		"class",
-		"lang",
-		"xml:lang",
-		"dir",
-		"title",
-		"style",
-		"epub:type",
-		"role",
-		"aria-label",
-		"aria-hidden",
-		"tabindex",
-	]);
+    if (!allowedElements.has(tag)) {
+      if (el.childNodes?.length > 0) {
+        const span = doc.createElement("span");
+        span.className = `converted-${tag}`;
+        while (el.firstChild) span.appendChild(el.firstChild);
+        for (const child of span.childNodes) cleanElement(child);
+        if (el.parentNode) el.parentNode.replaceChild(span, el);
+        return;
+      }
+      if (el.parentNode) {
+        el.parentNode.removeChild(el);
+      }
+      return;
+    }
 
-	const allowedByTag: Record<string, string[]> = {
-		a: ["href", "target", "rel", "download", "hreflang", "type", "ping"],
-		img: [
-			"src",
-			"alt",
-			"width",
-			"height",
-			"loading",
-			"decoding",
-			"crossorigin",
-		],
-		link: ["href", "rel", "type", "media", "sizes", "crossorigin"],
-		meta: ["name", "content", "http-equiv", "charset"],
-		script: ["src", "type", "async", "defer", "crossorigin"],
-		input: [
-			"type",
-			"name",
-			"value",
-			"checked",
-			"placeholder",
-			"readonly",
-			"disabled",
-			"required",
-		],
-		button: ["type", "name", "value", "disabled", "form"],
-		form: ["action", "method", "enctype", "name", "target", "novalidate"],
-		iframe: [
-			"src",
-			"srcdoc",
-			"name",
-			"sandbox",
-			"allow",
-			"allowfullscreen",
-			"loading",
-		],
-	};
+    if (el.attributes) {
+      for (const attr of [...el.attributes]) {
+        const name = attr.name;
+        if (
+          !allowedGlobalAttrs.has(name) &&
+          !name.startsWith("data-") &&
+          !allowedByTag[tag]?.includes(name)
+        ) {
+          el.removeAttribute(name);
+        }
+      }
+    }
 
-	// Handle DOM element cleaning - using any due to different DOM implementations (Deno DOM vs standard DOM)
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	function cleanElement(el: any): void {
-		if (!el) return;
+    if (el.childNodes) {
+      for (const child of [...el.childNodes]) {
+        cleanElement(child);
+      }
+    }
+  }
 
-		// Skip non-element nodes
-		if (el.nodeType !== 1) return;
+  if (doc.body) {
+    for (const node of [...doc.body.childNodes]) {
+      cleanElement(node);
+    }
+  }
 
-		const tag = (el.tagName?.toLowerCase?.() ?? "") as string;
-
-		// Handle invalid elements - replace with spans or remove
-		if (!allowedElements.has(tag)) {
-			if (el.childNodes && el.childNodes.length > 0) {
-				// If element has content, replace with span to preserve content
-				const span = doc.createElement("span");
-				span.className = `converted-${tag}`;
-
-				// Move all children to the new span
-				while (el.firstChild) {
-					span.appendChild(el.firstChild);
-				}
-
-				// Clean the new span's children
-				for (const child of span.childNodes) {
-					cleanElement(child);
-				}
-
-				// Replace the original element with the span
-				if (el.parentNode) {
-					el.parentNode.replaceChild(span, el);
-				}
-				return; // Element already processed
-			}
-			// If no content, remove the element
-			if (el.parentNode) {
-				el.parentNode.removeChild(el);
-			}
-			return; // Element already removed
-		}
-
-		// Clean attributes for valid elements
-		if (el.attributes) {
-			for (const attr of [...el.attributes]) {
-				const name = attr.name;
-
-				const isAllowed =
-					allowedGlobalAttrs.has(name) ||
-					name.startsWith("data-") ||
-					allowedByTag[tag]?.includes(name);
-
-				if (!isAllowed) {
-					el.removeAttribute(name);
-				}
-			}
-		}
-
-		// Process children recursively
-		if (el.childNodes) {
-			for (const child of [...el.childNodes]) {
-				cleanElement(child);
-			}
-		}
-	}
-
-	// Start cleaning from body
-	if (doc.body) {
-		// Process all nodes in body
-		for (const node of [...doc.body.childNodes]) {
-			cleanElement(node);
-		}
-	}
-
-	return doc.body?.innerHTML || ""; // Return only the cleaned markup
+  return doc.body?.innerHTML || "";
 }
 
+// ── Public API ────────────────────────────────────────────────────────────
+
 /**
- * Converts an HTML string to well-formed EPUB-compatible XHTML using xmldom.
- * Filters out invalid elements and attributes according to EPUB 3.3 spec.
+ * Converts raw HTML to EPUB-compliant XHTML.
  *
- * @param html - Raw HTML input.
- * @param options - Configuration options.
- * @param options.bodyOnly - Whether to return only the body content.
+ * Uses **parse5** (via `html-to-xhtml`) for spec-correct HTML5 parsing and
+ * strict XHTML serialization — handles CDATA wrapping in `<script>`/`<style>`,
+ * self-closing void elements, boolean attribute expansion,
+ * `xml:lang` mirroring, SVG/MathML namespace re-assertion, illegal XML char
+ * stripping, and comment `--` escaping.
+ *
+ * EPUB 3.3 element/attribute filtering is applied as a pre-processing step
+ * with Deno DOM before the XHTML conversion.
+ *
+ * @param html   - Raw HTML input.
+ * @param options.bodyOnly - Return only the `<body>` child content (no
+ *                           `<?xml?>`, DOCTYPE, `<html>`, `<head>`, or
+ *                           `<body>` wrapper).
+ * @param options.lang     - Language tag to stamp on `<html>` as both
+ *                           `lang` and `xml:lang`.
  * @returns XHTML string compliant with EPUB 3.3.
  */
 export function convertHtmlToXhtml(
-	html: string,
-	options: { bodyOnly?: boolean } = {},
+  html: string,
+  options: { bodyOnly?: boolean; lang?: string } = {},
 ): string {
-	try {
-		// First pass: use Deno DOM to clean up invalid elements and attributes
-		const cleanedHtml = preprocessHtmlWithDenoDom(html);
+  try {
+    // Step 1: strip EPUB-disallowed elements/attributes
+    const cleanedHtml = sanitizeHtml(html);
 
-		// Second pass: ensure well-formed XML with xmldom parser
-		const parser = new XmldomParser({
-			errorHandler: {
-				warning: (msg) => console.warn(`XHTML parser warning: ${msg}`),
-				error: (msg) => console.error(`XHTML parser error: ${msg}`),
-				fatalError: (msg) => {
-					throw new Error(`Fatal XHTML parsing error: ${msg}`);
-				},
-			},
-		});
+    // Step 2: robust HTML → XHTML via parse5
+    const result = htmlToXhtml(cleanedHtml, {
+      epub: true,
+      pretty: false,
+      lang: options.lang,
+    });
 
-		const doc = parser.parseFromString(cleanedHtml, "text/html");
+    if (options.bodyOnly) {
+      const bodyMatch = result.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      return bodyMatch ? bodyMatch[1].trim() : cleanedHtml;
+    }
 
-		if (!doc) {
-			throw new Error("Failed to parse cleaned HTML with xmldom.");
-		}
-
-		const serializer = new XMLSerializer();
-
-		if (options.bodyOnly) {
-			const body = doc.getElementsByTagName("body")[0];
-			if (!body) return "";
-
-			return Array.from(body.childNodes)
-				.map((node) => serializer.serializeToString(node))
-				.join("\n")
-				.trim();
-		}
-
-		// Ensure XHTML namespace
-		if (!doc.documentElement.getAttribute("xmlns")) {
-			doc.documentElement.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-		}
-
-		const stuff = serializer.serializeToString(doc).trim();
-
-		return stuff;
-	} catch (error) {
-		console.error("Error converting HTML to XHTML:", error);
-		// Return a fallback clean version that removes problematic content
-		const returnedStuff = `<div>${html.replace(/<\/?[^>]+(>|$)/g, "")}</div>`;
-
-		return returnedStuff;
-	}
+    return result;
+  } catch (error) {
+    console.error("Error converting HTML to XHTML:", error);
+    return `<div>${html.replace(/<\/?[^>]+(>|$)/g, "")}</div>`;
+  }
 }
-
-// Example usage:
-// const rawHtml = `<div 14-year-old opportunity: --><img src="x.jpg"><br>Some & text</div>`;
-// const xhtml = convertHtmlToXhtml(rawHtml, { bodyOnly: true });
-// console.log(xhtml);
