@@ -1,5 +1,6 @@
 import { htmlToXhtml } from "html-to-xhtml";
-import { DOMParser as DenoDOMParser } from "@b-fuze/deno-dom";
+import { load } from "cheerio";
+import type { AnyNode, Element } from "domhandler";
 
 // ── EPUB 3.3 allowed elements ──────────────────────────────────────────────
 
@@ -135,62 +136,56 @@ const allowedByTag: Record<string, string[]> = {
 // ── EPUB sanitization ─────────────────────────────────────────────────────
 
 /**
- * Pre-process HTML with Deno DOM to strip elements/attributes
+ * Pre-process HTML with Cheerio to strip elements/attributes
  * not allowed per EPUB 3.3. Returns clean body inner HTML.
  */
 function sanitizeHtml(html: string): string {
-  const parser = new DenoDOMParser();
-  const doc = parser.parseFromString(html, "text/html");
-  if (!doc) throw new Error("Failed to parse HTML with Deno DOM.");
+  const $ = load(html);
+  const body = $("body");
+  const rootNodes = (body.length ? body.contents() : $.root().contents()).toArray();
 
-  function cleanElement(el: any): void {
-    if (!el) return;
-    if (el.nodeType !== 1) return;
-
-    const tag = (el.tagName?.toLowerCase?.() ?? "") as string;
+  function cleanElement(node: AnyNode): void {
+    if (node.type !== "tag") return;
+    const el = node as Element;
+    const tag = el.tagName.toLowerCase();
 
     if (!allowedElements.has(tag)) {
-      if (el.childNodes?.length > 0) {
-        const span = doc.createElement("span");
-        span.className = `converted-${tag}`;
-        while (el.firstChild) span.appendChild(el.firstChild);
-        for (const child of span.childNodes) cleanElement(child);
-        if (el.parentNode) el.parentNode.replaceChild(span, el);
+      if (el.children.length > 0) {
+        const span = $("<span></span>").addClass(`converted-${tag}`);
+        const children = [...el.children];
+        for (const child of children) {
+          span.append(child);
+        }
+        $(el).replaceWith(span);
+        for (const child of span.contents().toArray()) {
+          cleanElement(child);
+        }
         return;
       }
-      if (el.parentNode) {
-        el.parentNode.removeChild(el);
-      }
+      $(el).remove();
       return;
     }
 
-    if (el.attributes) {
-      for (const attr of [...el.attributes]) {
-        const name = attr.name;
-        if (
-          !allowedGlobalAttrs.has(name) &&
-          !name.startsWith("data-") &&
-          !allowedByTag[tag]?.includes(name)
-        ) {
-          el.removeAttribute(name);
-        }
+    for (const name of Object.keys(el.attribs)) {
+      if (
+        !allowedGlobalAttrs.has(name) &&
+        !name.startsWith("data-") &&
+        !allowedByTag[tag]?.includes(name)
+      ) {
+        $(el).removeAttr(name);
       }
     }
 
-    if (el.childNodes) {
-      for (const child of [...el.childNodes]) {
-        cleanElement(child);
-      }
+    for (const child of [...el.children]) {
+      cleanElement(child);
     }
   }
 
-  if (doc.body) {
-    for (const node of [...doc.body.childNodes]) {
-      cleanElement(node);
-    }
+  for (const node of rootNodes) {
+    cleanElement(node);
   }
 
-  return doc.body?.innerHTML || "";
+  return body.length ? body.html() || "" : $.root().html() || "";
 }
 
 // ── Public API ────────────────────────────────────────────────────────────
@@ -205,7 +200,7 @@ function sanitizeHtml(html: string): string {
  * stripping, and comment `--` escaping.
  *
  * EPUB 3.3 element/attribute filtering is applied as a pre-processing step
- * with Deno DOM before the XHTML conversion.
+ * with Cheerio before the XHTML conversion.
  *
  * @param html   - Raw HTML input.
  * @param options.bodyOnly - Return only the `<body>` child content (no

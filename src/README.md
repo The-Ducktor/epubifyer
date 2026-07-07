@@ -54,7 +54,7 @@ Additional test file, likely for testing specific components or edge cases.
 The library uses a class-based approach with the `Epub` class as the main interface. It leverages:
 
 - `jszip` for creating the ZIP-based EPUB file
-- `@b-fuze/deno-dom` and `xmldom` for HTML/XML parsing and manipulation
+- `cheerio` and `xmldom` for HTML/XML parsing and manipulation
 - TypeScript for type safety
 
 The EPUB generation process involves:
@@ -66,7 +66,7 @@ The EPUB generation process involves:
 
 ## Dependencies
 
-- `@b-fuze/deno-dom`: For DOM manipulation in Deno environment
+- `cheerio`: For HTML parsing and DOM-style manipulation
 - `xmldom`: For XML parsing and serialization
 - `jszip`: For creating ZIP files
 - `@types/xmldom`: Type definitions for xmldom

@@ -1,4 +1,4 @@
-import { DOMParser } from "@b-fuze/deno-dom";
+import { load } from "cheerio";
 import JSZip from "jszip";
 import { convertHtmlToXhtml } from "./htmltoxhtml";
 import type { EpubItem, EpubMetadata, NavPoint } from "./types";
@@ -64,14 +64,13 @@ class Epub {
   }
 
   private async imageProcessing(html: string, compress = true): Promise<string> {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-    if (!doc) return html;
+    const $ = load(html);
 
     // Handle images
-    const images = doc.querySelectorAll("img");
-    for (const img of images) {
-      const srcset = img.getAttribute("srcset");
+    const images = $("img").toArray();
+    for (const image of images) {
+      const img = $(image);
+      const srcset = img.attr("srcset");
       let chosenUrl: string | null = null;
 
       if (srcset) {
@@ -85,7 +84,7 @@ class Epub {
       }
 
       if (!chosenUrl) {
-        chosenUrl = img.getAttribute("src");
+        chosenUrl = img.attr("src") || null;
       }
       console.log(`processing remote images "${chosenUrl}"`);
 
@@ -104,29 +103,25 @@ class Epub {
 
             const mediaType = this.getMediaTypeFromExt(ext);
             const id = `img_${++this.uniqueIdCount}.${ext}`; // TODO uses seprate system for image id's so html names arn't scuffed
-            const epubImagePath = `images/image_${id}`;
             this.addImage(id, `image_${id}`, data, mediaType);
-            img.setAttribute("src", `../images/image_${id}`);
-            img.removeAttribute("srcset");
+            img.attr("src", `../images/image_${id}`);
+            img.removeAttr("srcset");
           }
         } catch {
           // Ignore fetch errors, leave image as is
         }
       }
 
-      img.removeAttribute("width");
-      img.removeAttribute("height");
+      img.removeAttr("width");
+      img.removeAttr("height");
     }
 
     // Remove width/height attributes from all elements
-    const allElements = doc.querySelectorAll("*");
-    for (const element of allElements) {
-      element.removeAttribute("width");
-      element.removeAttribute("height");
-    }
+    $("*").removeAttr("width");
+    $("*").removeAttr("height");
 
-    const body = doc.querySelector("body");
-    const content = body ? body.innerHTML : html;
+    const bodyContent = $("body").html();
+    const content = bodyContent ?? $.root().html() ?? html;
 
     // Convert the processed HTML to valid XHTML (body-only —
     // full document wrapper is applied in addChapter)
